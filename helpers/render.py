@@ -154,10 +154,21 @@ def extract_segment(
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height",
+         "-of", "csv=p=0:s=x", str(source)],
+        capture_output=True, text=True,
+    )
+    try:
+        sw, sh = (int(x) for x in probe.stdout.strip().split("x")[:2])
+        is_vertical = sh > sw
+    except Exception:
+        is_vertical = False
     if draft:
-        scale = "scale=1280:-2"
+        scale = "scale=-2:1280" if is_vertical else "scale=1280:-2"
     else:
-        scale = "scale=1920:-2"
+        scale = "scale=-2:1920" if is_vertical else "scale=1920:-2"
 
     vf_parts: list[str] = []
     if is_hdr_source(source):
