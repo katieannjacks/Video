@@ -195,16 +195,25 @@ def extract_segment(
     else:
         preset, crf = "fast", "20"
 
+    # Hybrid seek (Fase 2 — accurate frame seeking):
+    # Em vez de fast-seek até seg_start direto (que pula pra keyframe próximo
+    # e perde precisão de frame), faz fast-seek até 1s ANTES, e depois
+    # accurate-seek (decode frame-a-frame) o último 1s pra garantir frame exato.
+    # Em 525 segmentos, isso evita drift cumulativo de A/V.
+    seek_pre = max(0.0, seg_start - 1.0)
+    seek_fine = seg_start - seek_pre  # geralmente 1.0 (menor se seg_start < 1)
+
     cmd = [
         "ffmpeg", "-y",
-        "-ss", f"{seg_start:.3f}",
+        "-ss", f"{seek_pre:.3f}",  # fast seek até keyframe próximo
         "-i", str(source),
+        "-ss", f"{seek_fine:.3f}",  # accurate seek (frame-exato)
         "-t", f"{duration:.3f}",
         "-vf", vf,
         "-af", af,
         "-c:v", "libx264", "-preset", preset, "-crf", crf,
-        "-pix_fmt", "yuv420p", "-r", "24",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         str(out_path),
     ]
@@ -449,7 +458,7 @@ def apply_loudnorm_two_pass(
             "-i", str(input_path),
             "-c:v", "copy",
             "-af", filter_str,
-            "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+            "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             str(output_path),
         ]
@@ -481,7 +490,7 @@ def apply_loudnorm_two_pass(
         "-i", str(input_path),
         "-c:v", "copy",
         "-af", filter_str,
-        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+        "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         str(output_path),
     ]
