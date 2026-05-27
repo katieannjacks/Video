@@ -11,6 +11,7 @@ Usage:
     python helpers/transcribe.py <video_path> --edit-dir /custom/edit
     python helpers/transcribe.py <video_path> --language en
     python helpers/transcribe.py <video_path> --num-speakers 2
+    python helpers/transcribe.py <video_path> --prompt-file vocabulary.txt
 """
 
 from __future__ import annotations
@@ -29,6 +30,11 @@ import requests
 
 SCRIBE_URL = "https://api.elevenlabs.io/v1/speech-to-text"
 
+# ElevenLabs Scribe `keyterms` constraints (see API docs).
+SCRIBE_KEYTERM_MAX_CHARS = 50
+SCRIBE_KEYTERM_MAX_WORDS = 5
+SCRIBE_KEYTERMS_MAX_COUNT = 1000
+
 
 def load_api_key() -> str:
     for candidate in [Path(__file__).resolve().parent.parent / ".env", Path(".env")]:
@@ -46,6 +52,60 @@ def load_api_key() -> str:
     return v
 
 
+def load_keyterms(prompt_file: Path | None, verbose: bool = True) -> list[str]:
+    """Load vocabulary-biasing keyterms from a prompt file.
+
+    Parses the file ignoring `#` comments and blank lines. Returns a list of
+    phrases suitable for ElevenLabs Scribe's `keyterms` parameter. The same
+    file format ("one phrase per line, # comments") is also a good fit for
+    OpenAI Whisper's `initial_prompt` (just join with commas).
+
+    Skips silently with a warning if the file is missing — a session whose
+    genre ships no vocabulary.txt should still transcribe successfully.
+
+    Filters terms that exceed Scribe's per-keyterm limits (50 chars, 5 words)
+    and truncates the total list to SCRIBE_KEYTERMS_MAX_COUNT (1000).
+    """
+    if prompt_file is None:
+        return []
+
+    if not prompt_file.exists():
+        if verbose:
+            print(
+                f"  warn: --prompt-file not found ({prompt_file}); transcribing without keyterm bias",
+                flush=True,
+            )
+        return []
+
+    raw_lines = prompt_file.read_text().splitlines()
+    phrases: list[str] = []
+    skipped_oversize = 0
+    for line in raw_lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        word_count = len(stripped.split())
+        if len(stripped) > SCRIBE_KEYTERM_MAX_CHARS or word_count > SCRIBE_KEYTERM_MAX_WORDS:
+            skipped_oversize += 1
+            continue
+        phrases.append(stripped)
+
+    if len(phrases) > SCRIBE_KEYTERMS_MAX_COUNT:
+        if verbose:
+            print(
+                f"  warn: --prompt-file has {len(phrases)} phrases; truncating to "
+                f"{SCRIBE_KEYTERMS_MAX_COUNT} (Scribe limit)",
+                flush=True,
+            )
+        phrases = phrases[:SCRIBE_KEYTERMS_MAX_COUNT]
+
+    if verbose:
+        suffix = f" (skipped {skipped_oversize} oversize)" if skipped_oversize else ""
+        print(f"  keyterms: {len(phrases)} loaded from {prompt_file.name}{suffix}", flush=True)
+
+    return phrases
+
+
 def extract_audio(video_path: Path, dest: Path) -> None:
     cmd = [
         "ffmpeg", "-y", "-i", str(video_path),
@@ -60,6 +120,7 @@ def call_scribe(
     api_key: str,
     language: str | None = None,
     num_speakers: int | None = None,
+    keyterms: list[str] | None = None,
 ) -> dict:
     data: dict[str, str] = {
         "model_id": "scribe_v1",
@@ -71,6 +132,10 @@ def call_scribe(
         data["language_code"] = language
     if num_speakers:
         data["num_speakers"] = str(num_speakers)
+    if keyterms:
+        # Scribe accepts `keyterms` as a JSON-encoded array of strings when
+        # sent over multipart/form-data.
+        data["keyterms"] = json.dumps(keyterms)
 
     with open(audio_path, "rb") as f:
         resp = requests.post(
@@ -93,6 +158,7 @@ def transcribe_one(
     api_key: str,
     language: str | None = None,
     num_speakers: int | None = None,
+    keyterms: list[str] | None = None,
     verbose: bool = True,
 ) -> Path:
     """Transcribe a single video. Returns path to transcript JSON.
@@ -118,7 +184,7 @@ def transcribe_one(
         size_mb = audio.stat().st_size / (1024 * 1024)
         if verbose:
             print(f"  uploading {video.stem}.wav ({size_mb:.1f} MB)", flush=True)
-        payload = call_scribe(audio, api_key, language, num_speakers)
+        payload = call_scribe(audio, api_key, language, num_speakers, keyterms)
 
     out_path.write_text(json.dumps(payload, indent=2))
     dt = time.time() - t0
@@ -153,6 +219,19 @@ def main() -> None:
         default=None,
         help="Optional number of speakers when known. Improves diarization accuracy.",
     )
+    ap.add_argument(
+        "--prompt-file",
+        type=Path,
+        default=None,
+        help=(
+            "Optional vocabulary file (one phrase per line, '#' for comments). "
+            "Phrases are passed as ElevenLabs Scribe `keyterms` to bias "
+            "transcription toward proper nouns / domain terms (e.g. brand names, "
+            "people, places). Missing file is a warn+skip, not an error. "
+            "Equivalent semantics to Whisper's --initial-prompt; the same file "
+            "format works for both engines."
+        ),
+    )
     args = ap.parse_args()
 
     video = args.video.resolve()
@@ -161,6 +240,7 @@ def main() -> None:
 
     edit_dir = (args.edit_dir or (video.parent / "edit")).resolve()
     api_key = load_api_key()
+    keyterms = load_keyterms(args.prompt_file)
 
     transcribe_one(
         video=video,
@@ -168,6 +248,7 @@ def main() -> None:
         api_key=api_key,
         language=args.language,
         num_speakers=args.num_speakers,
+        keyterms=keyterms,
     )
 
 
