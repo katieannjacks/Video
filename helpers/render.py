@@ -146,6 +146,26 @@ def is_portrait_source(video: Path) -> bool:
         return False
 
 
+def probe_source_fps(video: Path) -> str | None:
+    """Return the source's frame rate as an ffmpeg-ready string (e.g. '60/1',
+    '30000/1001'), or None if it can't be determined.
+
+    Returned verbatim so fractional rates (29.97, 23.976) survive without
+    rounding when passed straight to ffmpeg's `-r`.
+    """
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=r_frame_rate",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+            capture_output=True, text=True, check=True,
+        )
+        val = out.stdout.strip()
+        return val if val and val != "0/0" else None
+    except Exception:
+        return None
+
+
 # -------- Per-segment extraction (Rule 2 + Rule 3) --------------------------
 
 
@@ -157,6 +177,7 @@ def extract_segment(
     out_path: Path,
     preview: bool = False,
     draft: bool = False,
+    rate: str | None = None,
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
@@ -195,6 +216,12 @@ def extract_segment(
     else:
         preset, crf = "fast", "20"
 
+    # Frame rate: use the rate the caller resolved once for the whole render
+    # (every segment must share it — concat -c copy in Rule 2 requires a uniform
+    # frame rate). When called standalone with no rate, preserve this source's
+    # own rate; fall back to 24 only if it can't be probed.
+    out_rate = rate if rate is not None else (probe_source_fps(source) or "24")
+
     cmd = [
         "ffmpeg", "-y",
         "-ss", f"{seg_start:.3f}",
@@ -203,7 +230,7 @@ def extract_segment(
         "-vf", vf,
         "-af", af,
         "-c:v", "libx264", "-preset", preset, "-crf", crf,
-        "-pix_fmt", "yuv420p", "-r", "24",
+        "-pix_fmt", "yuv420p", "-r", out_rate,
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart",
         str(out_path),
@@ -216,6 +243,7 @@ def extract_all_segments(
     edit_dir: Path,
     preview: bool,
     draft: bool = False,
+    fps: int | None = None,
 ) -> list[Path]:
     """Extract every EDL range into edit_dir/clips_graded/seg_NN.mp4.
     Returns the ordered list of segment paths.
@@ -234,8 +262,22 @@ def extract_all_segments(
     ranges = edl["ranges"]
     sources = edl["sources"]
 
+    # Resolve ONE output frame rate for the entire render and apply it to every
+    # segment. The lossless concat (Rule 2, `-c copy`) requires all segments to
+    # share a frame rate; probing per-segment would diverge for multi-source
+    # EDLs that mix rates (e.g. a 30fps and a 60fps source) and break the concat.
+    # Explicit --fps wins; otherwise preserve the first source's rate.
+    if fps is not None:
+        out_rate = str(fps)
+    elif ranges:
+        first_src = resolve_path(sources[ranges[0]["source"]], edit_dir)
+        out_rate = probe_source_fps(first_src) or "24"
+    else:
+        out_rate = "24"
+
     seg_paths: list[Path] = []
-    print(f"extracting {len(ranges)} segment(s) → {clips_dir.name}/")
+    print(f"extracting {len(ranges)} segment(s) → {clips_dir.name}/  @ {out_rate} fps"
+          f"{' (forced)' if fps is not None else ' (from source)'}")
     if is_auto:
         print("  (auto-grade per segment: analyzing each range)")
     for i, r in enumerate(ranges):
@@ -255,7 +297,7 @@ def extract_all_segments(
         print(f"  [{i:02d}] {src_name}  {start:7.2f}-{end:7.2f}  ({duration:5.2f}s)  {note}")
         if is_auto:
             print(f"        grade: {seg_filter or '(none)'}")
-        extract_segment(src_path, start, duration, seg_filter, out_path, preview=preview, draft=draft)
+        extract_segment(src_path, start, duration, seg_filter, out_path, preview=preview, draft=draft, rate=out_rate)
         seg_paths.append(out_path)
 
     return seg_paths
@@ -601,6 +643,13 @@ def main() -> None:
         action="store_true",
         help="Skip audio loudness normalization. Default is on (-14 LUFS, -1 dBTP, LRA 11).",
     )
+    ap.add_argument(
+        "--fps",
+        type=int,
+        default=None,
+        help="Output frame rate. Default: preserve the source's frame rate "
+             "(falls back to 24 if it can't be probed). Pass e.g. --fps 30 to force.",
+    )
     args = ap.parse_args()
 
     edl_path = args.edl.resolve()
@@ -613,7 +662,7 @@ def main() -> None:
 
     # 1. Extract per-segment (auto-grade per range if EDL grade is "auto")
     segment_paths = extract_all_segments(
-        edl, edit_dir, preview=args.preview, draft=args.draft
+        edl, edit_dir, preview=args.preview, draft=args.draft, fps=args.fps
     )
 
     # 2. Concat → base
