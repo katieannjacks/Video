@@ -4,6 +4,11 @@
 *.pem
 *.key
 
+# school-email skill runtime files (local config + dedup state)
+skills/school-email/scripts/config.json
+skills/school-email/scripts/state.json
+skills/school-email/scripts/state.json.tmp
+
 # Python
 __pycache__/
 *.py[cod]
