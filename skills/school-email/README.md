@@ -3,18 +3,34 @@
 A Claude Code skill that triages **school email** into two trustworthy outputs:
 
 ```
-FETCH    unread mail from ONE school sender (Gmail)
+FETCH    unread mail from the configured school senders (Gmail)
   ↓
-EXTRACT  read the whole email → structured items (category + date + verbatim quote)
+EXTRACT  read the whole email → structured items (category + date + child + quote)
   ↓
-ROUTE    action_required        → Notion task list
+ROUTE    action_required        → Notion task list (tagged by child)
          school_closure (7d)    ┐
-         parent_attendance (14d)┘→ Google Calendar, on a lead-time delay
+         parent_attendance (14d)┘→ Google Calendar, color-coded per child,
+                                    on a lead-time delay
          fyi                     → dropped
   ↓
-DEDUP    a stable per-item key + a state file → never surface the same thing
-         twice, even though cron runs ~3x/day
+DEDUP    a stable per-item key (incl. child) + a state file → never surface the
+         same thing twice, even though cron runs ~3x/day
 ```
+
+### Per-child colors
+
+Each item is attributed to a child with priority **explicit name in the email →
+the sender's default child → general**, and calendar events are colored to match:
+
+| Child | Color | Google `colorId` |
+|-------|-------|------------------|
+| Audrey | purple (Grape) | `3` |
+| Cory | green (Basil) | `10` |
+| Reid | blue (Peacock) | `7` |
+| general | calendar default | — |
+
+Configure both the `senders` → default-child map and the `children` → color map
+in `config.json`.
 
 School emails arrive as digests ("Community Update", "Weekly Update") that bundle
 several messages and bury the actual ask 4–6 paragraphs deep. The skill reads the
@@ -49,7 +65,9 @@ can't quote from the text.
 
 | Key | Meaning | Default |
 |-----|---------|---------|
-| `sender` | The single Gmail sender to watch | — (required) |
+| `senders` | Map of Gmail sender → default child (or `general`) | — (required) |
+| `children` | Map of child → `{grade, color_id, color_name}` | — |
+| `default_color_id` | Calendar color for `general` items | `null` |
 | `notion_data_source_id` | Notion task DB data source | — (required) |
 | `calendar_id` | Target Google Calendar | `primary` |
 | `timezone` | IANA tz for timed events | `America/New_York` |

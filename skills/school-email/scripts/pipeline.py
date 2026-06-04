@@ -101,11 +101,29 @@ def _normalize_title(title):
     return t
 
 
-def item_key(category, title, event_date):
+def item_key(category, title, event_date, child="general"):
     """Stable dedup key. Deliberately excludes the source email so the same
-    item bundled into multiple digests dedups to one row."""
-    basis = f"{category}|{_normalize_title(title)}|{event_date or 'null'}"
+    item bundled into multiple digests dedups to one row. Includes the resolved
+    child so the same date for two different kids stays two distinct items."""
+    basis = f"{category}|{_normalize_title(title)}|{event_date or 'null'}|{(child or 'general').lower()}"
     return hashlib.sha1(basis.encode("utf-8")).hexdigest()[:16]
+
+
+def resolve_child(item_child, sender_child, children):
+    """Priority: explicit name on the item > sender's default child > general.
+    Only names present in the configured `children` map are honored."""
+    if item_child and item_child in children:
+        return item_child
+    if sender_child and sender_child in children:
+        return sender_child
+    return "general"
+
+
+def child_color(child, children, default_color_id):
+    info = children.get(child) if child else None
+    if info and info.get("color_id"):
+        return str(info["color_id"])
+    return default_color_id
 
 
 def validate_event(event, index):
@@ -141,6 +159,10 @@ def validate_event(event, index):
     if snip is not None and not isinstance(snip, str):
         errors.append(f"event[{index}]: snippet must be a string")
 
+    child = event.get("child", None)
+    if child not in (None, "") and not isinstance(child, str):
+        errors.append(f"event[{index}]: child must be a name string or null")
+
     return errors
 
 
@@ -166,18 +188,21 @@ def _iter_events(payload):
         if not isinstance(entry, dict):
             raise ValueError("each extraction entry must be an object")
         email_id = entry.get("email_id") or entry.get("thread_id") or entry.get("message_id")
+        sender_child = entry.get("sender_child")
         for event in entry.get("events", []):
-            yield email_id, event
+            yield email_id, sender_child, event
 
 
 def route(payload, cfg, state, today):
     lead_times = cfg.get("lead_times", DEFAULT_LEAD_TIMES)
+    children = cfg.get("children", {})
+    default_color_id = cfg.get("default_color_id")
     seen = state.get("seen", {})
 
     surface, held, skipped, errors = [], [], [], []
 
     raw = list(_iter_events(payload))
-    for idx, (email_id, event) in enumerate(raw):
+    for idx, (email_id, sender_child, event) in enumerate(raw):
         ev_errors = validate_event(event, idx)
         if ev_errors:
             errors.extend(ev_errors)
@@ -186,13 +211,17 @@ def route(payload, cfg, state, today):
         cat = event["category"]
         title = event["title"]
         event_date = _norm_date(event.get("event_date"))
-        key = item_key(cat, title, event_date)
+        child = resolve_child(event.get("child"), sender_child, children)
+        color_id = child_color(child, children, default_color_id)
+        key = item_key(cat, title, event_date, child)
 
         base = {
             "key": key,
             "category": cat,
             "title": title,
             "event_date": event_date,
+            "child": child,
+            "color_id": color_id,
             "snippet": event.get("snippet", ""),
             "action_text": event.get("action_text", ""),
             "url": event.get("url", ""),
@@ -278,6 +307,7 @@ def record(items, state, today):
             "category": item.get("category"),
             "title": item.get("title"),
             "event_date": item.get("event_date"),
+            "child": item.get("child"),
             "destination": item.get("destination"),
             "dest_id": item.get("dest_id", ""),
             "first_seen": today.isoformat(),
@@ -306,7 +336,7 @@ def _parse_today(value):
 def cmd_validate(args):
     payload = _read_stdin_json()
     errors = []
-    for idx, (_email, event) in enumerate(_iter_events(payload)):
+    for idx, (_email, _sender_child, event) in enumerate(_iter_events(payload)):
         errors.extend(validate_event(event, idx))
     print(json.dumps({"valid": not errors, "errors": errors}, indent=2))
     return 1 if errors else 0

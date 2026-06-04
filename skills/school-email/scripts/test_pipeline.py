@@ -31,10 +31,24 @@ def ev(**kw):
     return base
 
 
+CHILDREN = {
+    "Audrey": {"color_id": "3"},
+    "Cory": {"color_id": "10"},
+    "Reid": {"color_id": "7"},
+}
+
+
 def run(events, state=None, today=TODAY, cfg=None):
     cfg = cfg or {"lead_times": dict(pipeline.DEFAULT_LEAD_TIMES)}
     state = state or {"seen": {}, "processed_threads": []}
     return pipeline.route({"events": events}, cfg, state, today)
+
+
+def run_entries(entries, state=None, today=TODAY, cfg=None):
+    """Route a list of per-email entries (each may carry sender_child)."""
+    cfg = cfg or {"lead_times": dict(pipeline.DEFAULT_LEAD_TIMES), "children": CHILDREN}
+    state = state or {"seen": {}, "processed_threads": []}
+    return pipeline.route(entries, cfg, state, today)
 
 
 class ValidationTests(unittest.TestCase):
@@ -179,6 +193,67 @@ class DedupTests(unittest.TestCase):
         items = run([ev(title="Form")])["surface"]
         self.assertEqual(pipeline.record(items, state, TODAY), 1)
         self.assertEqual(pipeline.record(items, state, TODAY), 0)
+
+
+class ChildColorTests(unittest.TestCase):
+    def test_sender_default_child_colors_calendar(self):
+        # kkuhn -> Audrey: a dated closure from that sender is purple (3)
+        entries = [{"email_id": "t1", "sender_child": "Audrey",
+                    "events": [ev(category="school_closure", title="Half day", event_date="2026-06-10")]}]
+        s = run_entries(entries)["surface"][0]
+        self.assertEqual(s["child"], "Audrey")
+        self.assertEqual(s["color_id"], "3")
+
+    def test_explicit_name_overrides_sender(self):
+        # General sender, but the item names Reid -> blue (7)
+        entries = [{"email_id": "t1", "sender_child": "general",
+                    "events": [ev(category="parent_attendance", title="Reid recital",
+                                  event_date="2026-06-10", child="Reid", event_time_start="18:00")]}]
+        s = run_entries(entries)["surface"][0]
+        self.assertEqual(s["child"], "Reid")
+        self.assertEqual(s["color_id"], "7")
+        self.assertFalse(s["all_day"])
+
+    def test_general_has_no_color(self):
+        entries = [{"email_id": "t1", "sender_child": "general",
+                    "events": [ev(category="school_closure", title="Teacher workday", event_date="2026-06-10")]}]
+        s = run_entries(entries)["surface"][0]
+        self.assertEqual(s["child"], "general")
+        self.assertIsNone(s["color_id"])
+
+    def test_unknown_child_name_falls_back_to_sender(self):
+        entries = [{"email_id": "t1", "sender_child": "Audrey",
+                    "events": [ev(category="school_closure", title="Half day",
+                                  event_date="2026-06-10", child="Bartholomew")]}]
+        self.assertEqual(run_entries(entries)["surface"][0]["child"], "Audrey")
+
+    def test_default_color_applies_to_general(self):
+        cfg = {"lead_times": dict(pipeline.DEFAULT_LEAD_TIMES), "children": CHILDREN, "default_color_id": "8"}
+        entries = [{"email_id": "t1", "sender_child": "general",
+                    "events": [ev(category="school_closure", title="PD day", event_date="2026-06-10")]}]
+        self.assertEqual(run_entries(entries, cfg=cfg)["surface"][0]["color_id"], "8")
+
+    def test_same_date_two_kids_not_deduped(self):
+        cfg = {"lead_times": dict(pipeline.DEFAULT_LEAD_TIMES), "children": CHILDREN}
+        state = {"seen": {}, "processed_threads": []}
+        cory = [{"email_id": "t1", "sender_child": "general",
+                 "events": [ev(category="parent_attendance", title="Field day",
+                               event_date="2026-06-10", child="Cory")]}]
+        reid = [{"email_id": "t2", "sender_child": "general",
+                 "events": [ev(category="parent_attendance", title="Field day",
+                               event_date="2026-06-10", child="Reid")]}]
+        r1 = pipeline.route(cory, cfg, state, TODAY)
+        pipeline.record(r1["surface"], state, TODAY)
+        r2 = pipeline.route(reid, cfg, state, TODAY)
+        # different child -> different key -> still surfaces
+        self.assertEqual(r2["counts"]["surface"], 1)
+        self.assertEqual(r2["surface"][0]["color_id"], "7")
+
+    def test_child_in_validate(self):
+        self.assertEqual(pipeline.validate_event(ev(child="Audrey"), 0), [])
+        self.assertEqual(pipeline.validate_event(ev(child=None), 0), [])
+        errs = pipeline.validate_event(ev(child=123), 0)
+        self.assertTrue(any("child" in e for e in errs))
 
 
 class StateIOTests(unittest.TestCase):

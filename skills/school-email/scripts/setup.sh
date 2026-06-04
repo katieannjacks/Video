@@ -29,8 +29,13 @@ if [ -f "$here/config.json" ]; then
   python3 - "$here/config.json" <<'PY' || warn "config.json still has placeholder values to fill in"
 import json,sys
 c=json.load(open(sys.argv[1]))
-need=[k for k in ("sender","notion_data_source_id") if str(c.get(k,"")).startswith("REQUIRED") or not c.get(k)]
-sys.exit(1 if need else 0)
+bad=[]
+if str(c.get("notion_data_source_id","")).startswith("REQUIRED") or not c.get("notion_data_source_id"):
+    bad.append("notion_data_source_id")
+senders=c.get("senders") or {}
+if not senders or any("yourschool" in s for s in senders):
+    bad.append("senders")
+sys.exit(1 if bad else 0)
 PY
 else
   warn "no config.json yet — copy config.example.json to config.json and fill it in"

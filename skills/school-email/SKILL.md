@@ -26,7 +26,7 @@ when it's close enough to matter, and never twice.
 
 ## Prerequisites (one-time)
 
-- `scripts/config.json` exists (copy `config.example.json`) with a real `sender`
+- `scripts/config.json` exists (copy `config.example.json`) with a `senders` map
   and `notion_data_source_id`. Run `bash scripts/setup.sh` to check.
 - The three MCP servers are connected: **Gmail**, **Notion**, **Google Calendar**.
   Tool names below are given by their suffix (e.g. `search_threads`); the server
@@ -40,8 +40,26 @@ when it's close enough to matter, and never twice.
   ```sql
   CREATE TABLE ("Task" TITLE, "Status" STATUS, "Due" DATE,
                 "Category" SELECT('action_required':blue, 'review':orange),
+                "Child" SELECT('Audrey':purple, 'Cory':green, 'Reid':blue, 'General':gray),
                 "Source quote" RICH_TEXT, "Link" URL)
   ```
+
+### Senders and per-child colors
+
+`config.json` watches several `senders`, each mapped to a default child (or
+`general`). `children` maps each child to a Google Calendar `colorId`:
+
+| Child | Color | colorId |
+|-------|-------|---------|
+| Audrey (5th) | purple — Grape | `3` |
+| Cory (K) | green — Basil | `10` |
+| Reid (K) | blue — Peacock | `7` |
+| general | calendar default | none |
+
+A child is resolved per item with priority **explicit name in the email →
+sender's default child → general**. So a General-sender email that names Cory
+turns green; an unattributed closure stays the default color. `pipeline.py`
+computes the resolved `child` and `color_id` for you — don't do it by hand.
 
 ## Run loop
 
@@ -49,21 +67,28 @@ Read `scripts/extraction_prompt.md` first — it is the canonical EXTRACT contra
 
 ### 1. FETCH
 
-Call Gmail `search_threads` with `query: "from:<sender> is:unread"` (sender from
-config). For each thread returned, call `get_thread` with
-`messageFormat: FULL_CONTENT` to get the full body of every message in the
-thread. Keep the `threadId` — you'll mark it processed at the end.
+Build one query from all configured senders and pull unread:
+`query: "from:(kkuhn@wcpss.net OR bcline@wcpss.net OR cstomp@wcpss.net OR noreply@wcpss.net) is:unread"`
+(use the actual keys of `senders`). For each thread returned, call `get_thread`
+with `messageFormat: FULL_CONTENT` to get the full body of every message. Note
+each thread's actual `From` address and `threadId` — you need both: the From
+address selects the sender's default child, the threadId marks it processed.
 
 If nothing is unread, stop: there's nothing to do.
 
 ### 2. EXTRACT
 
 For each email, apply the prompt in `scripts/extraction_prompt.md` to the
-**entire body** and produce the JSON it specifies. One object per email:
+**entire body** and produce the JSON it specifies. One object per email, tagged
+with the sender's default child (look up the From address in `senders`):
 
 ```json
-{ "email_id": "<threadId>", "events": [ … ] }
+{ "email_id": "<threadId>", "sender_child": "<senders[from] or 'general'>", "events": [ … ] }
 ```
+
+The per-item `child` field (set only when a child is named in the text) overrides
+`sender_child`. If a digest's messages come from different senders, split it into
+one entry per sender so `sender_child` stays correct.
 
 Collect them into a list. Validate before routing:
 
@@ -87,9 +112,12 @@ each surfaced item a `destination` and stable `key`. You only act on `surface`:
 - **`destination: "notion"`** — create a row with `notion-create-pages` under the
   configured `data_source_id`. Map: `Task`←title, `Due`←event_date (omit if
   null), `Category`←`action_required` or `review` (when `reason` is
-  `no_date_review`), `Source quote`←snippet, `Link`←url. Put `action_text` in the
-  page body.
-- **`destination: "calendar"`** — create an event with `create_event`:
+  `no_date_review`), `Child`←`child` (use `General` when child is `general`),
+  `Source quote`←snippet, `Link`←url. Put `action_text` in the page body.
+- **`destination: "calendar"`** — create an event with `create_event`. Pass
+  `colorId` = the item's `color_id` when it's non-null (purple/green/blue per
+  child); omit `colorId` entirely when it's null (general → calendar default).
+  Set `calendarId` from config. Then:
   - `all_day: true` → set `allDay: true`; `startTime`/`endTime` = the
     `event_date` at midnight (same day, or end = next day).
   - `all_day: false` → build `startTime`/`endTime` from `event_date` +

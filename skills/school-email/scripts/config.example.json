@@ -1,5 +1,12 @@
 {
-  "sender": "REQUIRED: the ONE school address to watch, e.g. updates@yourschool.org",
+  "senders": {
+    "teacher@yourschool.org": "ChildName",
+    "noreply@yourschool.org": "general"
+  },
+  "children": {
+    "ChildName": { "grade": "5", "color_id": "3", "color_name": "purple (Grape)" }
+  },
+  "default_color_id": null,
   "timezone": "America/New_York",
   "notion_data_source_id": "REQUIRED: data_source_id of the Notion task database (see README)",
   "calendar_id": "primary",

@@ -32,6 +32,10 @@ CRITICAL RULES:
 - 'url' (optional): the sign-up / RSVP link tied to the action. Never invent one.
 - 'event_time_start'/'event_time_end' (parent_attendance only): 24h HH:MM,
   parsed verbatim. Never invent times.
+- 'child' (optional): if the item clearly concerns ONE named child — "Audrey",
+  "Cory", or "Reid" — set it to that exact name. If the item names no child, or
+  is school/district-wide (closures, district notices), set null. NEVER guess a
+  child from the sender or the grade; only set it when a name appears in the text.
 - No items → return {"events": []}.
 
 Output ONLY valid JSON, no prose:
@@ -41,6 +45,7 @@ Output ONLY valid JSON, no prose:
       "category": "action_required|school_closure|parent_attendance|fyi",
       "title": "...",
       "event_date": "YYYY-MM-DD | null",
+      "child": "Audrey | Cory | Reid | null",
       "snippet": "",
       "action_text": "",
       "url": "",
