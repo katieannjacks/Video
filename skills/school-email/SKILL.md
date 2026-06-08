@@ -67,8 +67,10 @@ Read `scripts/extraction_prompt.md` first — it is the canonical EXTRACT contra
 
 ### 1. FETCH
 
-Build one query from all configured senders and pull unread:
-`query: "from:(kkuhn@wcpss.net OR bcline@wcpss.net OR cstomp@wcpss.net OR noreply@wcpss.net) is:unread"`
+Build one query from all configured senders and pull unread, scoped to the
+configured `gmail_query_window` (default `newer_than:45d`) so old backlog mail
+isn't reprocessed:
+`query: "from:(kkuhn@wcpss.net OR bcline@wcpss.net OR cstomp@wcpss.net OR noreply@wcpss.net) is:unread newer_than:45d"`
 (use the actual keys of `senders`). For each thread returned, call `get_thread`
 with `messageFormat: FULL_CONTENT` to get the full body of every message. Note
 each thread's actual `From` address and `threadId` — you need both: the From
@@ -142,10 +144,11 @@ echo '<JSON list of the surfaced items you created>' \
 ```
 
 (You can pipe the whole `route` output's `surface` array, or filter to the ones
-that succeeded.) Then, for each fully-processed thread, use the Gmail
-`label_thread` tool to remove `UNREAD` and add the `Processed/School` label, and
-call `pipeline.py processed <threadId>` to log it. This keeps the next run from
-re-reading the same mail.
+that succeeded.) Then, for each fully-processed thread: call the Gmail
+`unlabel_thread` tool to remove `UNREAD` (mark read) and `label_thread` to add
+the `Processed/School` label, then `pipeline.py processed <threadId>` to log it.
+This keeps the next run from re-reading the same mail. (`label_thread` only adds
+labels — removing `UNREAD` requires `unlabel_thread`.)
 
 ### 5. Report
 

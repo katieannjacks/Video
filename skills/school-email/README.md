@@ -70,6 +70,7 @@ can't quote from the text.
 | `default_color_id` | Calendar color for `general` items | `null` |
 | `notion_data_source_id` | Notion task DB data source | — (required) |
 | `calendar_id` | Target Google Calendar | `primary` |
+| `gmail_query_window` | Gmail recency filter for FETCH | `newer_than:45d` |
 | `timezone` | IANA tz for timed events | `America/New_York` |
 | `gmail_processed_label` | Label applied after processing | `Processed/School` |
 | `lead_times.school_closure` | Days ahead closures surface | `7` |

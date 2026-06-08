@@ -70,6 +70,11 @@ def load_config(path):
         lead.update(user.get("lead_times", {}))
         cfg.update(user)
         cfg["lead_times"] = lead
+        # Resolve a relative state_path against the config file's directory so
+        # behavior doesn't depend on the current working directory.
+        sp = cfg.get("state_path")
+        if sp and not os.path.isabs(sp):
+            cfg["state_path"] = os.path.join(os.path.dirname(os.path.abspath(path)), sp)
     if not cfg.get("state_path"):
         cfg["state_path"] = _default_state_path()
     return cfg
