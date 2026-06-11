@@ -73,18 +73,11 @@
 
   /* Gallery */
   .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-  .shot{aspect-ratio:4/3;border-radius:12px;display:flex;align-items:flex-end;justify-content:center;color:#fff;font-weight:700;text-align:center;padding:14px;font-size:15px;overflow:hidden;position:relative;
-    background:linear-gradient(135deg,var(--wood),var(--charcoal))}
-  .shot.photo{background:linear-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.7)),url("images/home-bar.png") center/cover}
-  .shot.photo2{background:linear-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.7)),url("images/built-in-office.png") center/cover}
-  .shot.photo3{background:linear-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.7)),url("images/screen-porch.png") center/cover}
-  .shot.photo4{background:linear-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.7)),url("images/floating-shelves.png") center/cover}
-  .shot.photo5{background:linear-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.7)),url("images/kitchen.png") center/cover}
-  .shot.photo6{background:linear-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.7)),url("images/bathroom.png") center/cover}
-  .shot.photo7{background:linear-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.7)),url("images/deck.png") center/cover}
-  .shot.photo8{background:linear-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.7)),url("images/deck-porch.png") center/cover}
-  .shot:nth-child(2n){background:linear-gradient(135deg,var(--gold),var(--wood-dark))}
-  .shot:nth-child(3n){background:linear-gradient(135deg,var(--charcoal-soft),var(--wood))}
+  .shot{aspect-ratio:4/3;border-radius:12px;display:flex;align-items:flex-end;justify-content:center;color:#fff;font-weight:700;text-align:center;padding:14px;font-size:15px;overflow:hidden;position:relative;background:#5e3c20;transition:.25s}
+  .shot::before{content:"";position:absolute;inset:0;background-image:var(--img);background-size:cover;background-position:center;transition:transform .35s}
+  .shot::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,0) 48%,rgba(0,0,0,.74))}
+  .shot:hover::before{transform:scale(1.07)}
+  .shot span{position:relative;z-index:2;text-shadow:0 1px 6px rgba(0,0,0,.6)}
   .gallery-note{text-align:center;color:var(--muted);margin-top:22px;font-size:14px}
 
   /* About */
@@ -230,16 +223,18 @@
     <h2 class="sec-title">Recent Projects</h2>
     <p class="sec-intro">A few of the spaces we&apos;ve transformed. Swipe through our latest builds.</p>
     <div class="gallery">
-      <div class="shot photo">Custom Home Bar<br>&amp; Lounge</div>
-      <div class="shot photo3">Screened Porch<br>&amp; Deck Addition</div>
-      <div class="shot photo2">Built-In Home<br>Office</div>
-      <div class="shot photo4">Custom Floating<br>Shelving</div>
-      <div class="shot photo5">Luxury Kitchen<br>Remodel</div>
-      <div class="shot photo6">Master Bath<br>Renovation</div>
-      <div class="shot photo7">Composite Deck<br>&amp; Privacy Screen</div>
-      <div class="shot photo8">Deck &amp; Screened<br>Porch Build</div>
+      <div class="shot" style="--img:url('images/kitchen.png')"><span>Luxury Kitchen<br>Remodel</span></div>
+      <div class="shot" style="--img:url('images/kitchen2.png')"><span>Open-Concept<br>Kitchen</span></div>
+      <div class="shot" style="--img:url('images/home-bar.png')"><span>Custom Home Bar<br>&amp; Lounge</span></div>
+      <div class="shot" style="--img:url('images/bathroom.png')"><span>Master Bath<br>Renovation</span></div>
+      <div class="shot" style="--img:url('images/shower-marble.png')"><span>Spa Marble<br>Shower</span></div>
+      <div class="shot" style="--img:url('images/sunroom.png')"><span>Finished<br>Sunroom</span></div>
+      <div class="shot" style="--img:url('images/screen-porch.png')"><span>Screened Porch<br>Addition</span></div>
+      <div class="shot" style="--img:url('images/deck.png')"><span>Composite Deck<br>&amp; Privacy Screen</span></div>
+      <div class="shot" style="--img:url('images/built-in-office.png')"><span>Built-In Home<br>Office</span></div>
+      <div class="shot" style="--img:url('images/floating-shelves.png')"><span>Custom Floating<br>Shelving</span></div>
     </div>
-    <p class="gallery-note">📸 All real Built by Beards projects. Send more photos anytime and I&apos;ll drop them in.</p>
+    <p class="gallery-note">📸 Every photo here is a real Built by Beards project.</p>
   </div>
 </section>
 
