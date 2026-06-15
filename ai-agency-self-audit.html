@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agency Self-Audit Scorecard</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --ink:#e8eaf0; --mut:#9aa3b2; --acc:#5b8cff; --good:#3ecf8e;
+    --warn:#ffb454; --bad:#ff6b6b; --chip:#262b36;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto;padding:28px 20px 80px}
+  header h1{font-size:26px;margin:0 0 4px}
+  header p{color:var(--mut);margin:0 0 6px}
+  .credit{font-size:13px;color:var(--mut);background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:10px 14px;margin:14px 0 22px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0 8px;position:sticky;top:0;
+    background:var(--bg);padding:14px 0;z-index:5;border-bottom:1px solid var(--line)}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center}
+  .stat .v{font-size:24px;font-weight:700}
+  .stat .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+  .stat .sub{font-size:12px;color:var(--mut);margin-top:3px;min-height:16px}
+  .cat{margin:26px 0 0}
+  .cat h2{font-size:16px;margin:0 0 2px;color:var(--acc)}
+  .cat .crange{font-size:12px;color:var(--mut);margin-bottom:10px}
+  .q{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0}
+  .q .num{font-size:12px;color:var(--mut);font-weight:700}
+  .q .txt{margin:4px 0 12px;font-size:15px}
+  .scale{display:flex;gap:8px;flex-wrap:wrap}
+  .scale button{flex:1;min-width:54px;background:var(--chip);border:1px solid var(--line);color:var(--ink);
+    border-radius:9px;padding:9px 0;cursor:pointer;font-size:15px;font-weight:600;transition:.12s}
+  .scale button:hover{border-color:var(--acc)}
+  .scale button.sel{background:var(--acc);border-color:var(--acc);color:#fff}
+  .scale .lab{display:block;font-size:9px;font-weight:500;color:rgba(255,255,255,.55);margin-top:2px}
+  .scale button.sel .lab{color:rgba(255,255,255,.85)}
+  .meta{margin-top:30px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .meta h2{font-size:16px;margin:0 0 10px;color:var(--warn)}
+  .meta li{margin:8px 0;color:var(--ink)}
+  .meta .hint{color:var(--mut);font-size:13px}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;margin:26px 0 0}
+  .btn{background:var(--acc);color:#fff;border:none;border-radius:10px;padding:11px 18px;font-size:14px;
+    font-weight:600;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn.good{background:var(--good)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:22px 0}
+  .panel h2{font-size:16px;margin:0 0 10px}
+  canvas{width:100%;max-width:100%;background:var(--panel2);border-radius:10px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .reflect-out{white-space:pre-wrap;background:#0c0e12;border:1px solid var(--line);border-radius:10px;
+    padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:#cdd5e2;
+    margin-top:12px;display:none}
+  .empty{color:var(--mut);font-size:13px}
+  details.how{margin:22px 0 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 16px}
+  details.how summary{cursor:pointer;font-weight:600;padding:10px 0}
+  details.how p,details.how li{color:var(--mut);font-size:14px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--good);color:#04210f;
+    padding:10px 18px;border-radius:10px;font-weight:600;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>AI Agency Self-Audit</h1>
+    <p>An honest monthly gut check on whether you're drifting toward failure — or doing the right thing.</p>
+  </header>
+
+  <div class="credit">
+    Built on an <strong>inversion-thinking framework by Brandon True</strong>, presented in the Playmakers
+    AI Agency group. All credit for the original 17-point inversion exercise goes to Brandon. This tool just
+    turns it into a question-by-question audit you can track over time.
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="sTotal">0<span style="font-size:14px;color:var(--mut)">/85</span></div><div class="l">Total</div><div class="sub" id="sTotalSub"></div></div>
+    <div class="stat"><div class="v" id="sAvg">–</div><div class="l">Average</div><div class="sub">per question</div></div>
+    <div class="stat"><div class="v" id="sWeak" style="font-size:15px">–</div><div class="l">Weakest area</div><div class="sub" id="sWeakSub"></div></div>
+    <div class="stat"><div class="v" id="sLast">–</div><div class="l">vs last month</div><div class="sub" id="sLastSub"></div></div>
+  </div>
+
+  <div id="questions"></div>
+
+  <div class="meta">
+    <h2>Meta-questions — the patterns the 17 don't quite catch</h2>
+    <ul>
+      <li>Am I going <strong>deep in one niche/vertical</strong> where I'm becoming known — or spreading thin
+        across unrelated verticals so reputation and referrals never compound?
+        <div class="hint">Niching vs. spreading.</div></li>
+      <li>What share of my hours this month went to <strong>work for paying clients</strong> vs. building
+        things on spec for hypothetical future customers?
+        <div class="hint">Building for paying clients vs. on spec.</div></li>
+      <li>Could a stranger repeat my <strong>offer back to me in one sentence</strong> — who it's for, what
+        painful problem it solves, and what it costs — or is my offer still fuzzy and custom every time?
+        <div class="hint">Productized offer clarity.</div></li>
+    </ul>
+    <p class="hint">These aren't scored — they're for the journal. Jot your honest answer each month before you save.</p>
+  </div>
+
+  <div class="bar">
+    <button class="btn good" id="saveBtn">Save this month's snapshot</button>
+    <button class="btn ghost" id="reflectBtn">Reflect on weakest areas</button>
+    <button class="btn ghost" id="resetBtn">Clear ratings</button>
+  </div>
+
+  <div class="panel" id="reflectPanel" style="display:none">
+    <h2>Hand this back to Claude</h2>
+    <p class="empty">Copy the prompt below into Claude (or your AI assistant). It lists your lowest-scored
+      questions so it can build you a focused 30-day plan to fix them.</p>
+    <button class="btn" id="copyReflect">Copy prompt</button>
+    <div class="reflect-out" id="reflectOut"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Score history</h2>
+    <canvas id="chart" height="220"></canvas>
+    <div id="historyTable"></div>
+  </div>
+
+  <details class="how">
+    <summary>How to use this scorecard</summary>
+    <p>Once a month, rate each of the 17 questions from <strong>1 (drifting toward failure)</strong> to
+      <strong>5 (doing the right thing)</strong>. Answer fast and honestly — your gut already knows.</p>
+    <ul>
+      <li>The header shows your live <strong>total /85</strong>, average, current <strong>weakest area</strong>,
+        and the change versus your last saved month.</li>
+      <li>Hit <strong>Save this month's snapshot</strong> to lock in the month. Snapshots are stored locally
+        in this browser — nothing leaves your machine.</li>
+      <li>The chart plots your total over time so you can <em>see</em> drift before it becomes a crisis.</li>
+      <li><strong>Reflect on weakest areas</strong> builds a prompt from your lowest scores to paste back to
+        Claude for a 30-day improvement plan specific to your agency.</li>
+    </ul>
+    <p><strong>The goal isn't a perfect score — it's catching drift early.</strong> An 85 every month probably
+      means you're being too easy on yourself. Look for the dips and the questions you keep avoiding.</p>
+  </details>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORE_KEY = "aiAgencyAuditHistory.v1";
+const RATING_KEY = "aiAgencyAuditCurrent.v1";
+
+const CATEGORIES = [
+  { name: "Focus & discipline", range: "Q1–3", questions: [
+    "Am I still working on the same painful problem I committed to — or have I jumped to a new business idea or niche again in the last few days?",
+    "When I learned something new this month, was it to solve a real problem in front of a customer — or just to find out what a tool can do?",
+    "Am I learning only the tools the next customer problem actually requires — or collecting tutorials and platforms I have no immediate use for?"
+  ]},
+  { name: "Outreach & pipeline", range: "Q4–7", questions: [
+    "Am I doing outreach manually and actually talking to prospects — or hiding behind building an automated enrichment/outreach system before I understand my customers?",
+    "Have I started real conversations with prospects — or am I postponing outreach to polish a website, LinkedIn, brand and content nobody has asked for?",
+    "Am I using unscalable, hands-on methods to find customers right now — or refusing to do outreach because I can't yet see a scalable way to do it?",
+    "When a prospect says they're interested, do I keep the rest of my pipeline alive until money is collected and the project is stable — or do I freeze all other outreach to wait on that one prospect?"
+  ]},
+  { name: "Sales conversations", range: "Q8–9", questions: [
+    "When someone voices a pain point, am I qualifying whether it's a valuable, painful problem worth solving — or bending over backwards for every tiny request no matter how small?",
+    "When someone says they need to “think about it,” do I follow up professionally and consistently — or give them “space” and quietly let the deal die?"
+  ]},
+  { name: "Money & pricing", range: "Q10–12", questions: [
+    "Am I taking legitimate paid one-time jobs to build skills, trust, cash flow and referrals — or holding out for passive/recurring revenue and saying no to good work?",
+    "Am I getting commitment and payment early whenever possible — or doing tons of free work before I ever collect a dime?",
+    "Am I charging confidently and raising prices as my value and evidence grow — or staying hesitant to ask for cash up front and clinging to old low rates?"
+  ]},
+  { name: "Delivery", range: "Q13–15", questions: [
+    "Am I spending my build hours on high-leverage problems with real business impact — or dumping hundreds of hours into automating a 5-minute job?",
+    "Am I communicating proactively so the client always feels informed and confident — or only surfacing at big milestones because I tell myself I'm protecting their time?",
+    "When I finish a job, do I finish strong — collecting reviews, testimonials, documentation and upsells — or do I “crash land” across the line and disappear?"
+  ]},
+  { name: "Where to look for work", range: "Q16–17", questions: [
+    "Am I pursuing the clear opportunities already in my current jobs and circle — or avoiding them because I think I need something bigger?",
+    "Did I spend more time this month talking to actual customers than consuming AI news, podcasts and channels to “stay current”?"
+  ]}
+];
+
+const SCALE_LABELS = ["Drifting", "", "Mixed", "", "Doing right"];
+
+// Flatten to a stable list of 17 with category index
+const QUESTIONS = [];
+CATEGORIES.forEach((c, ci) => c.questions.forEach(q => QUESTIONS.push({ text: q, cat: c.name, ci })));
+
+let ratings = loadRatings();
+
+function loadRatings(){
+  try { return JSON.parse(localStorage.getItem(RATING_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function saveRatings(){ localStorage.setItem(RATING_KEY, JSON.stringify(ratings)); }
+function loadHistory(){
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch(e){ return []; }
+}
+function saveHistory(h){ localStorage.setItem(STORE_KEY, JSON.stringify(h)); }
+
+function renderQuestions(){
+  const root = document.getElementById("questions");
+  root.innerHTML = "";
+  let idx = 0;
+  CATEGORIES.forEach(cat => {
+    const sec = document.createElement("div");
+    sec.className = "cat";
+    sec.innerHTML = `<h2>${cat.name}</h2><div class="crange">${cat.range}</div>`;
+    cat.questions.forEach(qtext => {
+      const qi = idx;
+      const card = document.createElement("div");
+      card.className = "q";
+      const scale = [1,2,3,4,5].map(n => {
+        const sel = ratings[qi] === n ? " sel" : "";
+        const lab = SCALE_LABELS[n-1] ? `<span class="lab">${SCALE_LABELS[n-1]}</span>` : "";
+        return `<button class="${sel.trim()}" data-q="${qi}" data-n="${n}">${n}${lab}</button>`;
+      }).join("");
+      card.innerHTML = `<div class="num">Q${qi+1}</div><div class="txt">${qtext}</div><div class="scale">${scale}</div>`;
+      sec.appendChild(card);
+      idx++;
+    });
+    root.appendChild(sec);
+  });
+  root.querySelectorAll(".scale button").forEach(b => {
+    b.addEventListener("click", () => {
+      const q = +b.dataset.q, n = +b.dataset.n;
+      ratings[q] = n;
+      saveRatings();
+      b.parentElement.querySelectorAll("button").forEach(x => x.classList.remove("sel"));
+      b.classList.add("sel");
+      updateStats();
+    });
+  });
+}
+
+function catScores(r){
+  const sums = {}; const counts = {};
+  CATEGORIES.forEach(c => { sums[c.name]=0; counts[c.name]=0; });
+  QUESTIONS.forEach((q,i) => {
+    if(r[i]){ sums[q.cat]+=r[i]; counts[q.cat]++; }
+  });
+  return CATEGORIES.map(c => ({
+    name: c.name,
+    avg: counts[c.name] ? sums[c.name]/counts[c.name] : null,
+    answered: counts[c.name],
+    total: c.questions.length
+  }));
+}
+
+function totalScore(r){
+  return QUESTIONS.reduce((s,_,i) => s + (r[i]||0), 0);
+}
+function answeredCount(r){
+  return QUESTIONS.reduce((n,_,i) => n + (r[i]?1:0), 0);
+}
+
+function updateStats(){
+  const total = totalScore(ratings);
+  const ans = answeredCount(ratings);
+  document.getElementById("sTotal").innerHTML = `${total}<span style="font-size:14px;color:var(--mut)">/85</span>`;
+  document.getElementById("sTotalSub").textContent = `${ans}/17 answered`;
+  document.getElementById("sAvg").textContent = ans ? (total/ans).toFixed(1) : "–";
+
+  // weakest area
+  const cs = catScores(ratings).filter(c => c.avg !== null);
+  if(cs.length){
+    cs.sort((a,b) => a.avg - b.avg);
+    document.getElementById("sWeak").textContent = cs[0].name;
+    document.getElementById("sWeakSub").textContent = `avg ${cs[0].avg.toFixed(1)}`;
+  } else {
+    document.getElementById("sWeak").textContent = "–";
+    document.getElementById("sWeakSub").textContent = "";
+  }
+
+  // vs last month
+  const hist = loadHistory();
+  const lastEl = document.getElementById("sLast");
+  const lastSub = document.getElementById("sLastSub");
+  if(hist.length){
+    const prev = hist[hist.length-1];
+    const diff = total - prev.total;
+    const sign = diff > 0 ? "+" : "";
+    lastEl.textContent = `${sign}${diff}`;
+    lastEl.style.color = diff > 0 ? "var(--good)" : diff < 0 ? "var(--bad)" : "var(--mut)";
+    lastSub.textContent = `${prev.month} was ${prev.total}`;
+  } else {
+    lastEl.textContent = "–";
+    lastSub.textContent = "no saved months yet";
+  }
+}
+
+function monthLabel(d){
+  return d.toLocaleString(undefined,{month:"short",year:"numeric"});
+}
+
+document.getElementById("saveBtn").addEventListener("click", () => {
+  if(answeredCount(ratings) < 17){
+    if(!confirm("You haven't rated all 17 questions. Save this partial snapshot anyway?")) return;
+  }
+  const hist = loadHistory();
+  const now = new Date();
+  const label = monthLabel(now);
+  const snap = {
+    month: label,
+    date: now.toISOString(),
+    total: totalScore(ratings),
+    answered: answeredCount(ratings),
+    cats: catScores(ratings).map(c => ({name:c.name, avg:c.avg})),
+    ratings: {...ratings}
+  };
+  // replace if same month already saved
+  const existingIdx = hist.findIndex(h => h.month === label);
+  if(existingIdx >= 0) hist[existingIdx] = snap; else hist.push(snap);
+  saveHistory(hist);
+  toast(existingIdx>=0 ? `Updated ${label}` : `Saved ${label}`);
+  updateStats(); renderChart(); renderHistoryTable();
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if(!confirm("Clear the current ratings? Saved monthly snapshots are kept.")) return;
+  ratings = {}; saveRatings(); renderQuestions(); updateStats();
+});
+
+document.getElementById("reflectBtn").addEventListener("click", () => {
+  const ans = answeredCount(ratings);
+  if(!ans){ toast("Rate some questions first"); return; }
+  // gather lowest scored (<=2 first; if none, the 3 lowest answered)
+  const scored = QUESTIONS.map((q,i) => ({...q, n:ratings[i], i})).filter(q => q.n);
+  scored.sort((a,b) => a.n - b.n);
+  let low = scored.filter(q => q.n <= 2);
+  if(low.length < 3) low = scored.slice(0, Math.min(5, scored.length));
+  const lines = low.map(q => `• [scored ${q.n}/5] (${q.cat}) ${q.text}`).join("\n");
+  const cs = catScores(ratings).filter(c=>c.avg!==null).sort((a,b)=>a.avg-b.avg);
+  const weakest = cs.length ? cs[0].name : "";
+  const prompt =
+`I just ran my monthly AI agency self-audit (the Brandon True inversion framework). My total was ${totalScore(ratings)}/85 and my weakest category is "${weakest}".
+
+These are the questions I scored lowest — the places I'm drifting toward failure:
+
+${lines}
+
+Help me build a focused, concrete 30-day plan to improve these specific areas. Make it specific to my agency: ask me anything you need about my niche, offer, and current clients first, then give me weekly milestones and the single most important action for week 1.`;
+  const out = document.getElementById("reflectOut");
+  out.textContent = prompt;
+  out.style.display = "block";
+  document.getElementById("reflectPanel").style.display = "block";
+  document.getElementById("reflectPanel").scrollIntoView({behavior:"smooth", block:"center"});
+});
+
+document.getElementById("copyReflect").addEventListener("click", () => {
+  const txt = document.getElementById("reflectOut").textContent;
+  navigator.clipboard.writeText(txt).then(()=>toast("Prompt copied")).catch(()=>toast("Select & copy manually"));
+});
+
+function renderHistoryTable(){
+  const hist = loadHistory();
+  const el = document.getElementById("historyTable");
+  if(!hist.length){ el.innerHTML = '<p class="empty">No saved months yet. Save a snapshot to start tracking.</p>'; return; }
+  const rows = hist.map(h => {
+    const weak = (h.cats||[]).filter(c=>c.avg!==null).sort((a,b)=>a.avg-b.avg)[0];
+    return `<tr><td>${h.month}</td><td>${h.total}/85</td><td>${h.answered}/17</td><td>${weak?weak.name:"–"}</td></tr>`;
+  }).join("");
+  el.innerHTML = `<table><thead><tr><th>Month</th><th>Total</th><th>Answered</th><th>Weakest area</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderChart(){
+  const hist = loadHistory();
+  const cv = document.getElementById("chart");
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = 220;
+  cv.width = W*dpr; cv.height = H*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  const pad = {l:38,r:16,t:16,b:28};
+  const x0=pad.l, x1=W-pad.r, y0=H-pad.b, y1=pad.t;
+
+  // y axis 0..85
+  ctx.strokeStyle="#2a2f3a"; ctx.fillStyle="#9aa3b2"; ctx.lineWidth=1; ctx.font="11px sans-serif";
+  [0,17,34,51,68,85].forEach(v => {
+    const y = y0 - (v/85)*(y0-y1);
+    ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke();
+    ctx.fillText(v, 6, y+3);
+  });
+
+  if(hist.length === 0){
+    ctx.fillStyle="#9aa3b2"; ctx.font="13px sans-serif";
+    ctx.fillText("Save monthly snapshots to plot your trend here.", x0+10, (y0+y1)/2);
+    return;
+  }
+
+  const n = hist.length;
+  const xStep = n>1 ? (x1-x0)/(n-1) : 0;
+  const px = i => n>1 ? x0 + i*xStep : (x0+x1)/2;
+  const py = v => y0 - (v/85)*(y0-y1);
+
+  // line
+  ctx.strokeStyle="#5b8cff"; ctx.lineWidth=2.5; ctx.beginPath();
+  hist.forEach((h,i) => { const X=px(i),Y=py(h.total); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
+  ctx.stroke();
+  // points + labels
+  hist.forEach((h,i) => {
+    const X=px(i),Y=py(h.total);
+    ctx.fillStyle="#5b8cff"; ctx.beginPath(); ctx.arc(X,Y,4,0,7); ctx.fill();
+    ctx.fillStyle="#e8eaf0"; ctx.font="11px sans-serif"; ctx.textAlign="center";
+    ctx.fillText(h.total, X, Y-9);
+    ctx.fillStyle="#9aa3b2"; ctx.fillText(h.month, X, y0+16);
+    ctx.textAlign="left";
+  });
+}
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove("show"), 1800);
+}
+
+// init
+renderQuestions();
+updateStats();
+renderChart();
+renderHistoryTable();
+window.addEventListener("resize", renderChart);
+</script>
+</body>
+</html>
