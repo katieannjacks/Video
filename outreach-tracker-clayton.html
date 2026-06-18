@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outreach Tracker</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --ink:#e8eaf0; --mut:#9aa3b2; --acc:#5b8cff; --good:#3ecf8e;
+    --warn:#ffb454; --bad:#ff6b6b; --chip:#262b36; --hot:#ff7a59;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 18px 80px}
+  header h1{font-size:24px;margin:0 0 4px}
+  header p{color:var(--mut);margin:0 0 4px}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:18px 0;position:sticky;top:0;
+    background:var(--bg);padding:12px 0;z-index:5;border-bottom:1px solid var(--line)}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:center}
+  .stat .v{font-size:22px;font-weight:700}
+  .stat .l{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+  .goal{height:6px;background:var(--chip);border-radius:4px;margin-top:6px;overflow:hidden}
+  .goal>div{height:100%;background:var(--good);width:0;transition:.3s}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 16px}
+  .btn{background:var(--acc);color:#fff;border:none;border-radius:9px;padding:9px 15px;font-size:13px;
+    font-weight:600;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn.good{background:var(--good);color:#04210f}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .filters input[type=search]{flex:1;min-width:180px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;
+    position:sticky;top:96px;background:var(--bg);cursor:pointer;user-select:none}
+  tr.overdue{background:rgba(255,107,107,.08)}
+  tr.duetoday{background:rgba(255,180,84,.08)}
+  tr.won{background:rgba(62,207,142,.08)}
+  tr.lost{opacity:.5}
+  .pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.3px}
+  .pill.hot{background:var(--hot);color:#2a0f06}
+  .pill.warm{background:var(--chip);color:var(--mut)}
+  .name{font-weight:600}
+  .sub{font-size:11px;color:var(--mut)}
+  td a{color:var(--acc);text-decoration:none}
+  .status-sel{font-size:12px;padding:4px 6px}
+  .due{font-size:12px}
+  .due .od{color:var(--bad);font-weight:700}
+  .due .dt{color:var(--warn);font-weight:700}
+  .empty{color:var(--mut);font-size:14px;text-align:center;padding:40px 0}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+  .modal.show{display:flex}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:560px;width:100%}
+  .card h3{margin:0 0 14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid2 label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
+  .grid2 label.full{grid-column:1/3}
+  .modal textarea{width:100%;min-height:120px;resize:vertical}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--good);color:#04210f;
+    padding:10px 18px;border-radius:10px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:30}
+  .toast.show{opacity:1}
+  .hide{display:none}
+  .note-btn{cursor:pointer;color:var(--mut);font-size:14px}
+  @media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}
+    .hideMobile{display:none}.grid2{grid-template-columns:1fr}.grid2 label.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Outreach Tracker</h1>
+    <p>Built by Beards → 5 messages a day → follow up before it slips. Saved in this browser only.</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="sToday">0<span style="font-size:13px;color:var(--mut)">/5</span></div><div class="l">Sent today</div><div class="goal"><div id="goalBar"></div></div></div>
+    <div class="stat"><div class="v" id="sDue" style="color:var(--warn)">0</div><div class="l">Follow-ups due</div></div>
+    <div class="stat"><div class="v" id="sActive">0</div><div class="l">In pipeline</div></div>
+    <div class="stat"><div class="v" id="sWon" style="color:var(--good)">0</div><div class="l">Won</div></div>
+    <div class="stat"><div class="v" id="sHot" style="color:var(--hot)">0</div><div class="l">Hot (no site)</div></div>
+  </div>
+
+  <div class="bar">
+    <button class="btn" id="addBtn">+ Add lead</button>
+    <button class="btn ghost" id="importBtn">Import leads.csv</button>
+    <button class="btn ghost" id="exportBtn">Export CSV</button>
+    <input type="file" id="fileInput" accept=".csv" class="hide">
+  </div>
+
+  <div class="filters">
+    <input type="search" id="search" placeholder="Search name, phone, address…">
+    <select id="fStatus">
+      <option value="">All statuses</option>
+    </select>
+    <select id="fPriority">
+      <option value="">All priorities</option>
+      <option value="HOT">Hot (no website)</option>
+      <option value="warm">Warm</option>
+    </select>
+    <label style="font-size:12px;color:var(--mut);display:flex;align-items:center;gap:5px">
+      <input type="checkbox" id="fDue" style="width:auto"> Due / overdue only
+    </label>
+  </div>
+
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th data-sort="priority">Lead</th>
+        <th data-sort="status">Status</th>
+        <th data-sort="contacted" class="hideMobile">Contacted</th>
+        <th data-sort="followup">Follow-up</th>
+        <th class="hideMobile">Notes</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="emptyState">No leads yet. Import your <strong>leads.csv</strong> from the scraper, or add one by hand.</div>
+</div>
+
+<!-- Add/Edit modal -->
+<div class="modal" id="leadModal">
+  <div class="card">
+    <h3 id="modalTitle">Add lead</h3>
+    <div class="grid2">
+      <label class="full">Business name<input id="mName" placeholder="e.g. Smith Carpentry"></label>
+      <label>Phone<input id="mPhone" placeholder="(919) …"></label>
+      <label>Website (blank = hot)<input id="mWebsite" placeholder=""></label>
+      <label class="full">Address / area<input id="mAddress" placeholder="Clayton, NC"></label>
+      <label>Maps / FB link<input id="mLink" placeholder="https://…"></label>
+      <label>Source<input id="mSource" placeholder="Google / Nextdoor / referral"></label>
+      <label class="full">Notes<textarea id="mNotes" placeholder="What you said, what they replied…"></textarea></label>
+    </div>
+    <div class="bar" style="margin-top:14px;justify-content:flex-end">
+      <button class="btn ghost" id="mCancel">Cancel</button>
+      <button class="btn good" id="mSave">Save lead</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = "outreachTracker.clayton.v1";
+const SEED_FLAG = "outreachSeeded.clayton.v1";
+const GOAL = 5;
+const STATUSES = ["To contact","Contacted","Follow-up due","Replied","Call booked","Won","Lost"];
+
+// Your 27 HOT leads (local contractors with no website) from find_leads.py,
+// loaded automatically the first time you open this file. The full 182-lead
+// list lives in leads.csv — use the "Import leads.csv" button if you want the
+// warm ones too.
+const SEED_CSV = `name,phone,website,has_website,address,rating,reviews,maps_url,priority
+Carolina Construction & Restoration,(910) 890-5740,,NO,"311 W Front St Box 203, Lillington, NC 27546, USA",5,151,https://maps.google.com/?cid=3471556524413921984,HOT
+Serranos Contracting llc,(919) 698-4144,,NO,"259 Venture Dr B, Smithfield, NC 27577, USA",5,43,https://maps.google.com/?cid=18291803443074960230,HOT
+"Modern Tile & Design, LLC",(919) 696-1384,,NO,"Whitted Rd, Fuquay-Varina, NC 27526, USA",5,38,https://maps.google.com/?cid=10171745496318726005,HOT
+Selco Construction Inc,(919) 934-9941,,NO,"52 Talton Farm Rd, Smithfield, NC 27577, USA",4.3,12,https://maps.google.com/?cid=2131661709975306568,HOT
+RCD Flooring LLC,(919) 427-6049,,NO,"3236 Benson Rd # D, Garner, NC 27529, USA",4.5,8,https://maps.google.com/?cid=3019568914151241615,HOT
+RMZ Renovations LLC,(984) 274-5232,,NO,"154 Halton Ln, Selma, NC 27576, USA",5,7,https://maps.google.com/?cid=8856232952931248004,HOT
+Preferred Siding And Construction LLC,(919) 980-0084,,NO,"215 W Davis St, Smithfield, NC 27577, USA",4.7,7,https://maps.google.com/?cid=3633709609087782889,HOT
+THH Construction,(919) 427-2058,,NO,"1919 New Bethel Church Rd, Garner, NC 27529, USA",5,6,https://maps.google.com/?cid=2292240671601862714,HOT
+Oak City Remodeling & Removal L.L.C,(919) 805-9946,,NO,"1624 Balfour Downs Cir, Fuquay-Varina, NC 27526, USA",4.3,6,https://maps.google.com/?cid=3174914886582738353,HOT
+Wooden Workshop,(919) 524-4402,,NO,"116 Hogan Dr, Garner, NC 27529, USA",5,5,https://maps.google.com/?cid=8834851903977365467,HOT
+RDU Custom Carpentry,(919) 746-6262,,NO,"637 Avondale Dr, Clayton, NC 27520, USA",5,4,https://maps.google.com/?cid=11729958903816402313,HOT
+"Clayton Professional Carpentry, Inc.",(919) 524-9330,,NO,"115 Bess Dr, Clayton, NC 27520, USA",5,3,https://maps.google.com/?cid=9084598296387947777,HOT
+K&H Carpentry,(919) 369-2504,,NO,"104 Kentucky Derby Dr, Clayton, NC 27520, USA",3.7,3,https://maps.google.com/?cid=1546021121234570298,HOT
+R H Painting And Remodeling LLC,(919) 455-3164,,NO,"162 Thunder Rd, Four Oaks, NC 27524, USA",5,3,https://maps.google.com/?cid=2652954522108099003,HOT
+Carolina Garage Builders,(919) 441-8647,,NO,"134 Thomas Mill Rd, Garner, NC 27529, USA",5,3,https://maps.google.com/?cid=17727679182440165544,HOT
+J M Daniels Construction Co,(919) 553-7463,,NO,"677 Dairy Rd, Clayton, NC 27520, USA",5,2,https://maps.google.com/?cid=5741892688310718509,HOT
+Allen & Sons Cabinet Shop Inc,(919) 963-2196,,NO,"5942 U.S. Hwy 301 S, Four Oaks, NC 27524, USA",5,2,https://maps.google.com/?cid=3478127592605332665,HOT
+Suarez Carrillo Remodeling LLC,(919) 518-4054,,NO,"169 Coriander Ln, Clayton, NC 27527, USA",5,1,https://maps.google.com/?cid=13602065955357342907,HOT
+Tap Construction Inc,(919) 934-3881,,NO,"223 King Mill Rd, Four Oaks, NC 27524, USA",5,1,https://maps.google.com/?cid=446249234461335255,HOT
+J & J Construction Pro LLC,(919) 333-4283,,NO,"601 E Woodall St, Smithfield, NC 27577, USA",5,1,https://maps.google.com/?cid=9718098949182690200,HOT
+C & M Construction Company Smithfield,(919) 989-6064,,NO,"507 E Johnston St, Smithfield, NC 27577, USA",5,1,https://maps.google.com/?cid=8985685903246658273,HOT
+"Avila's Quality carpentry , Inc",(919) 868-4102,,NO,"157 Beadle Ct, Smithfield, NC 27577, USA",1,1,https://maps.google.com/?cid=9932204820744028364,HOT
+Davis Floor Designs,(919) 202-6052,,NO,"332 N Brightleaf Blvd # E, Smithfield, NC 27577, USA",5,1,https://maps.google.com/?cid=4733855813918084832,HOT
+WoodcraftNC,(919) 948-6075,,NO,"1326 Bobbitt Dr, Garner, NC 27529, USA",5,1,https://maps.google.com/?cid=1563144404176830320,HOT
+Crossover Construction Inc,(919) 437-1121,,NO,"2772 King Mill Rd, Four Oaks, NC 27524, USA",,,https://maps.google.com/?cid=5354375039151274518,HOT
+Campbell's custom woodworking,,,NO,"3491 Hockaday Rd, Four Oaks, NC 27524, USA",,,https://maps.google.com/?cid=105960096259266391,HOT
+Oak City Renovations,(919) 276-2228,,NO,"8720 Clear Pool Ln, Willow Spring, NC 27592, USA",,,https://maps.google.com/?cid=9176883627125655066,HOT`;
+
+let leads = load();
+let sortKey = "priority", sortDir = 1;
+let editId = null;
+
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
+function save(){ localStorage.setItem(KEY, JSON.stringify(leads)); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function today(){ return new Date().toISOString().slice(0,10); }
+
+// populate status filter
+const fStatus = document.getElementById("fStatus");
+STATUSES.forEach(s => { const o=document.createElement("option"); o.value=s; o.textContent=s; fStatus.appendChild(o); });
+
+function daysBetween(d){ // d = yyyy-mm-dd vs today; negative = overdue
+  if(!d) return null;
+  const a = new Date(d+"T00:00:00"), b = new Date(today()+"T00:00:00");
+  return Math.round((a-b)/86400000);
+}
+
+function statusClass(l){
+  if(l.status==="Won") return "won";
+  if(l.status==="Lost") return "lost";
+  const d = daysBetween(l.followup);
+  if(l.followup && l.status!=="Won" && l.status!=="Lost"){
+    if(d < 0) return "overdue";
+    if(d === 0) return "duetoday";
+  }
+  return "";
+}
+
+function isDue(l){
+  if(l.status==="Won"||l.status==="Lost"||!l.followup) return false;
+  const d = daysBetween(l.followup); return d !== null && d <= 0;
+}
+
+function updateStats(){
+  const t = leads.filter(l => l.contacted === today()).length;
+  document.getElementById("sToday").innerHTML = `${t}<span style="font-size:13px;color:var(--mut)">/${GOAL}</span>`;
+  document.getElementById("goalBar").style.width = Math.min(100, t/GOAL*100) + "%";
+  document.getElementById("sDue").textContent = leads.filter(isDue).length;
+  document.getElementById("sActive").textContent = leads.filter(l => l.status!=="Won" && l.status!=="Lost").length;
+  document.getElementById("sWon").textContent = leads.filter(l => l.status==="Won").length;
+  document.getElementById("sHot").textContent = leads.filter(l => l.priority==="HOT" && l.status!=="Won" && l.status!=="Lost").length;
+}
+
+function render(){
+  const q = document.getElementById("search").value.toLowerCase();
+  const fs = document.getElementById("fStatus").value;
+  const fp = document.getElementById("fPriority").value;
+  const fd = document.getElementById("fDue").checked;
+
+  let list = leads.filter(l => {
+    if(fs && l.status!==fs) return false;
+    if(fp && l.priority!==fp) return false;
+    if(fd && !isDue(l)) return false;
+    if(q){
+      const hay = `${l.name} ${l.phone} ${l.address} ${l.source} ${l.notes}`.toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  list.sort((a,b) => {
+    let av,bv;
+    if(sortKey==="priority"){ av=a.priority==="HOT"?0:1; bv=b.priority==="HOT"?0:1; }
+    else if(sortKey==="followup"){ av=a.followup||"9999"; bv=b.followup||"9999"; }
+    else if(sortKey==="contacted"){ av=a.contacted||""; bv=b.contacted||""; }
+    else { av=(a[sortKey]||"").toString().toLowerCase(); bv=(b[sortKey]||"").toString().toLowerCase(); }
+    return av<bv ? -sortDir : av>bv ? sortDir : 0;
+  });
+
+  const rows = document.getElementById("rows");
+  document.getElementById("emptyState").style.display = leads.length ? "none" : "block";
+  rows.innerHTML = list.map(l => {
+    const d = daysBetween(l.followup);
+    let due = "—";
+    if(l.followup && l.status!=="Won" && l.status!=="Lost"){
+      if(d < 0) due = `<span class="od">${-d}d overdue</span>`;
+      else if(d === 0) due = `<span class="dt">today</span>`;
+      else due = `in ${d}d`;
+    } else if(l.followup){ due = l.followup; }
+    const pill = l.priority==="HOT"
+      ? `<span class="pill hot">HOT · no site</span>` : `<span class="pill warm">warm</span>`;
+    const linkPart = l.link ? `<a href="${l.link}" target="_blank" rel="noopener">map/page</a> · ` : "";
+    const opts = STATUSES.map(s => `<option ${s===l.status?"selected":""}>${s}</option>`).join("");
+    const noteShort = l.notes ? (l.notes.length>40 ? l.notes.slice(0,40)+"…" : l.notes) : "";
+    return `<tr class="${statusClass(l)}" data-id="${l.id}">
+      <td><div class="name">${esc(l.name)||"(no name)"}</div>
+          <div class="sub">${pill} ${esc(l.phone)||""}</div>
+          <div class="sub">${linkPart}${esc(l.address)||""}</div></td>
+      <td><select class="status-sel" data-act="status">${opts}</select></td>
+      <td class="hideMobile due">${l.contacted || `<button class="btn good sm" data-act="logtoday">Sent today</button>`}</td>
+      <td class="due">${due}<div class="sub"><input type="date" data-act="setfu" value="${l.followup||""}" style="font-size:11px;padding:3px 5px"></div></td>
+      <td class="hideMobile sub">${esc(noteShort)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <span class="note-btn" data-act="edit" title="Edit">✎</span>
+        <span class="note-btn" data-act="del" title="Delete" style="margin-left:8px">🗑</span></td>
+    </tr>`;
+  }).join("");
+
+  updateStats();
+}
+
+function esc(s){ return (s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// table actions (event delegation)
+document.getElementById("rows").addEventListener("click", e => {
+  const tr = e.target.closest("tr"); if(!tr) return;
+  const id = tr.dataset.id; const l = leads.find(x => x.id===id); if(!l) return;
+  const act = e.target.dataset.act;
+  if(act==="logtoday"){
+    l.contacted = today();
+    if(l.status==="To contact") l.status="Contacted";
+    if(!l.followup){ const f=new Date(); f.setDate(f.getDate()+3); l.followup=f.toISOString().slice(0,10); }
+    save(); render(); toast("Logged — nice. Next one.");
+  } else if(act==="del"){
+    if(confirm(`Delete ${l.name}?`)){ leads=leads.filter(x=>x.id!==id); save(); render(); }
+  } else if(act==="edit"){ openModal(l); }
+});
+document.getElementById("rows").addEventListener("change", e => {
+  const tr = e.target.closest("tr"); if(!tr) return;
+  const l = leads.find(x => x.id===tr.dataset.id); if(!l) return;
+  const act = e.target.dataset.act;
+  if(act==="status"){
+    l.status = e.target.value;
+    if((l.status==="Contacted"||l.status==="Replied") && !l.contacted) l.contacted=today();
+    save(); render();
+  } else if(act==="setfu"){ l.followup = e.target.value; save(); render(); }
+});
+
+// sorting
+document.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("click", () => {
+  const k = th.dataset.sort;
+  if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=1; }
+  render();
+}));
+
+["search","fStatus","fPriority"].forEach(id => document.getElementById(id).addEventListener("input", render));
+document.getElementById("fDue").addEventListener("change", render);
+
+// modal
+function openModal(l){
+  editId = l ? l.id : null;
+  document.getElementById("modalTitle").textContent = l ? "Edit lead" : "Add lead";
+  document.getElementById("mName").value = l?.name || "";
+  document.getElementById("mPhone").value = l?.phone || "";
+  document.getElementById("mWebsite").value = l?.website || "";
+  document.getElementById("mAddress").value = l?.address || "";
+  document.getElementById("mLink").value = l?.link || "";
+  document.getElementById("mSource").value = l?.source || "";
+  document.getElementById("mNotes").value = l?.notes || "";
+  document.getElementById("leadModal").classList.add("show");
+}
+function closeModal(){ document.getElementById("leadModal").classList.remove("show"); editId=null; }
+document.getElementById("addBtn").addEventListener("click", () => openModal(null));
+document.getElementById("mCancel").addEventListener("click", closeModal);
+document.getElementById("leadModal").addEventListener("click", e => { if(e.target.id==="leadModal") closeModal(); });
+document.getElementById("mSave").addEventListener("click", () => {
+  const website = document.getElementById("mWebsite").value.trim();
+  const data = {
+    name: document.getElementById("mName").value.trim(),
+    phone: document.getElementById("mPhone").value.trim(),
+    website, priority: website ? "warm" : "HOT",
+    address: document.getElementById("mAddress").value.trim(),
+    link: document.getElementById("mLink").value.trim(),
+    source: document.getElementById("mSource").value.trim(),
+    notes: document.getElementById("mNotes").value.trim()
+  };
+  if(!data.name){ toast("Give it a name"); return; }
+  if(editId){ Object.assign(leads.find(x=>x.id===editId), data); }
+  else { leads.push({id:uid(), status:"To contact", contacted:"", followup:"", ...data}); }
+  save(); closeModal(); render();
+});
+
+// CSV import (matches scraper output: name,phone,website,has_website,address,rating,reviews,maps_url,priority)
+document.getElementById("importBtn").addEventListener("click", () => document.getElementById("fileInput").click());
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { importCSV(ev.target.result); e.target.value=""; };
+  reader.readAsText(file);
+});
+
+function parseCSV(text){
+  const rows=[]; let row=[], cur="", q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else { if(c==='"') q=true; else if(c===','){ row.push(cur); cur=""; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=""; }
+      else if(c!=='\r') cur+=c; }
+  }
+  if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()!==""));
+}
+
+function importCSV(text){
+  const rows = parseCSV(text);
+  if(!rows.length){ toast("Empty file"); return; }
+  const header = rows[0].map(h => h.trim().toLowerCase());
+  const idx = n => header.indexOf(n);
+  const existing = new Set(leads.map(l => (l.name+l.phone).toLowerCase()));
+  let added=0;
+  rows.slice(1).forEach(r => {
+    const get = n => { const i=idx(n); return i>=0 ? (r[i]||"").trim() : ""; };
+    const name = get("name"); if(!name) return;
+    const phone = get("phone");
+    if(existing.has((name+phone).toLowerCase())) return;
+    const website = get("website");
+    const prio = get("priority") || (website ? "warm" : "HOT");
+    leads.push({
+      id:uid(), name, phone, website,
+      priority: prio.toUpperCase()==="HOT" ? "HOT" : "warm",
+      address: get("address"),
+      link: get("maps_url") || get("link"),
+      source: "scraper",
+      notes: [get("rating") && `★${get("rating")}`, get("reviews") && `${get("reviews")} reviews`].filter(Boolean).join(" · "),
+      status:"To contact", contacted:"", followup:""
+    });
+    existing.add((name+phone).toLowerCase()); added++;
+  });
+  save(); render();
+  toast(`Imported ${added} new lead${added===1?"":"s"}`);
+}
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const cols=["name","phone","website","priority","address","status","contacted","followup","notes"];
+  const csv=[cols.join(",")].concat(leads.map(l =>
+    cols.map(c => `"${(l[c]||"").toString().replace(/"/g,'""')}"`).join(","))).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="outreach-export.csv"; a.click();
+});
+
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1800); }
+
+// First time this file is opened, load the HOT leads automatically.
+if(!localStorage.getItem(SEED_FLAG)){
+  importCSV(SEED_CSV);
+  localStorage.setItem(SEED_FLAG, "1");
+}
+
+render();
+</script>
+</body>
+</html>
