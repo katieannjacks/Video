@@ -58,3 +58,7 @@ master.srt
 takes_packed.md
 edl.json
 project.md
+
+# Client-provided brand kit (proprietary; not redistributed)
+samples/springs-creative/brandkit/
+samples/springs-creative/_silent.mp4
