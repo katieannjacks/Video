@@ -62,3 +62,6 @@ project.md
 # Client-provided brand kit (proprietary; not redistributed)
 samples/springs-creative/brandkit/
 samples/springs-creative/_silent.mp4
+samples/springs-creative/voices/
+samples/springs-creative/_vo/
+samples/springs-creative/out/_*

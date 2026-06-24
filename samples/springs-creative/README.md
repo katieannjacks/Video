@@ -13,7 +13,24 @@ design system.
 Both carry an **original royalty-free music bed** composed in `build.py` (chord pad +
 arpeggio + soft percussion, loudness-normalized to −14 LUFS) — safe to post anywhere.
 
-## Brand fidelity
+## Full library (`out/`) + voiceover
+
+`studio.py` builds the complete set: the main promo **and** a 4-part service
+series (Websites, Local SEO, Social, AI Edge), each in **landscape / square /
+vertical** — 15 videos. These add a **free neural voiceover** (Piper, generated
+locally — no ElevenLabs/API key) ducked over the music, and a **"Book your FREE
+audit" QR end card** (→ ai-audit.springsyncai.com/landing, decode-verified).
+
+```bash
+uv run python samples/springs-creative/studio.py        # all 15
+uv run python samples/springs-creative/studio.py test   # main vertical only
+```
+The Piper voice model auto-downloads to `voices/` on first run (gitignored, ~60MB).
+Captions + a posting plan + GoHighLevel setup are in `POSTING.md`.
+
+---
+
+
 Pulled straight from the client's design-system handoff:
 - **Hero gradient** background (deep navy → brand blue → teal, 135°)
 - **Orange** (`#FF6E42`) accent for eyebrows, emphasis, and the CTA

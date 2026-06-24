@@ -163,6 +163,9 @@ FORMATS = {
     "vertical":  dict(W=1080, H=1920, margin=84, eyebrow=36, head=86, hook=86,
                       tag=48, title=66, contact=33, icon=168, logo_b=860, logo_c=680,
                       gap=40, center=0.48),
+    "square":    dict(W=1080, H=1080, margin=92, eyebrow=32, head=74, hook=78,
+                      tag=44, title=56, contact=30, icon=140, logo_b=720, logo_c=560,
+                      gap=24, center=0.50),
 }
 
 P: dict = {}
