@@ -204,8 +204,12 @@ def cmd_plan(args):
             sys.exit("No Google Business Profile account found. Use --account <id> or --all-accounts (run 'verify' to list).")
         account_ids = [gbp.get("id") or gbp.get("_id")]
 
-    print(f"{'COMMITTING' if args.commit else 'DRY RUN'} — {len(PLAN)} posts → accounts {account_ids}\n")
-    for item in PLAN:
+    items = PLAN[args.offset:]
+    if args.limit:
+        items = items[:args.limit]
+    print(f"{'COMMITTING' if args.commit else 'DRY RUN'} — {len(items)} of {len(PLAN)} posts "
+          f"(offset {args.offset}) → accounts {account_ids}\n")
+    for item in items:
         path = OUT / item["video"]
         if not path.exists():
             sys.exit(f"missing video: {path}")
@@ -228,6 +232,8 @@ def main():
     p.add_argument("--commit", action="store_true", help="actually write to GHL (default is dry run)")
     p.add_argument("--account", help="post to a specific account id")
     p.add_argument("--all-accounts", action="store_true", help="post to every connected account")
+    p.add_argument("--limit", type=int, default=0, help="only process the first N posts (0 = all)")
+    p.add_argument("--offset", type=int, default=0, help="skip the first N posts")
     args = ap.parse_args()
     {"verify": cmd_verify, "plan": cmd_plan}[args.cmd](args)
 
