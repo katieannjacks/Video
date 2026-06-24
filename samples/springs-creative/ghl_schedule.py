@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import os
 import sys
+import json
 import argparse
 from datetime import datetime, timedelta, time as dtime
 from pathlib import Path
@@ -98,33 +99,59 @@ def location_id():
 
 
 def get_accounts():
+    """Return the raw JSON from the accounts endpoint."""
     loc = location_id()
     r = requests.get(f"{BASE}/social-media-posting/{loc}/accounts", headers=headers(), timeout=30)
     if r.status_code >= 300:
         sys.exit(f"accounts failed [{r.status_code}]: {r.text}")
-    data = r.json()
-    # the list lives under one of these depending on API version
-    accts = data.get("accounts") or data.get("results") or (data.get("data") or {}).get("accounts") or []
-    return accts
+    return r.json()
+
+
+def extract_accounts(data):
+    """Find the list of account dicts regardless of response nesting."""
+    lst = None
+    if isinstance(data, list):
+        lst = data
+    elif isinstance(data, dict):
+        for k in ("accounts", "results", "data"):
+            v = data.get(k)
+            if isinstance(v, list):
+                lst = v
+                break
+            if isinstance(v, dict):
+                for k2 in ("accounts", "results"):
+                    if isinstance(v.get(k2), list):
+                        lst = v[k2]
+                        break
+            if lst is not None:
+                break
+    return [a for a in (lst or []) if isinstance(a, dict)]
 
 
 def cmd_verify(_args):
-    accts = get_accounts()
+    data = get_accounts()
+    accts = extract_accounts(data)
     if not accts:
-        print("Token works, but NO social accounts are connected to this location.")
-        print("Connect Google Business Profile in GHL → Marketing → Social Planner → Settings.")
+        print("Token reached GHL, but I couldn't auto-parse the account list.")
+        print("Copy everything below and send it to Claude:\n")
+        print(json.dumps(data, indent=2)[:4000])
         return
     print(f"Token OK. {len(accts)} connected account(s):\n")
     for a in accts:
-        print(f"  platform={a.get('platform','?'):<16} name={a.get('name','?'):<28} id={a.get('id') or a.get('_id')}")
+        plat = str(a.get("platform") or a.get("type") or "?")
+        name = str(a.get("name") or a.get("accountName") or "?")
+        print(f"  platform={plat:<18} name={name:<30} id={a.get('id') or a.get('_id')}")
     gbp = _find_gbp(accts)
-    print("\nGoogle Business Profile:", (gbp.get('id') or gbp.get('_id')) if gbp else "NOT FOUND — connect it in GHL")
+    print("\nGoogle Business Profile:",
+          (gbp.get('id') or gbp.get('_id')) if gbp else "not auto-detected — use --account <id> from the list above")
+    print("\n--- raw response (for reference) ---")
+    print(json.dumps(data, indent=2)[:3000])
 
 
 def _find_gbp(accts):
     for a in accts:
-        p = (a.get("platform") or "").lower()
-        if p in ("google", "gmb", "googlemybusiness", "google_business", "googlebusiness"):
+        blob = " ".join(str(a.get(k, "")) for k in ("platform", "type", "name", "accountName")).lower()
+        if any(w in blob for w in ("google", "gmb", "business profile", "gbp", "mybusiness")):
             return a
     return None
 
@@ -166,7 +193,7 @@ def create_post(account_ids, caption, media_url, when_iso, commit):
 
 def cmd_plan(args):
     start = datetime.strptime(args.start, "%Y-%m-%d").date()
-    accts = get_accounts()
+    accts = extract_accounts(get_accounts())
     if args.account:
         account_ids = [args.account]
     elif args.all_accounts:
