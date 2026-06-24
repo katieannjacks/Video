@@ -7,7 +7,11 @@ Business Profile, generated from a client caption with **video-use**. No footage
 and no ElevenLabs key — it's kinetic typography skinned with the client's real
 design system.
 
-▶︎ `samples/springs-creative/final.mp4` — 30.0s · 1080p · ~4 MB (GBP accepts ≤30s, ≥720p, ≤75 MB ✓)
+▶︎ `final.mp4` — 1920×1080, 30.0s (Google Business Profile · GBP accepts ≤30s, ≥720p, ≤75 MB ✓)
+▶︎ `final-vertical.mp4` — 1080×1920, 30.0s (Reels / TikTok / Stories)
+
+Both carry an **original royalty-free music bed** composed in `build.py` (chord pad +
+arpeggio + soft percussion, loudness-normalized to −14 LUFS) — safe to post anywhere.
 
 ## Brand fidelity
 Pulled straight from the client's design-system handoff:
