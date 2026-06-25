@@ -62,6 +62,7 @@ BASE = "https://services.leadconnectorhq.com"
 VERSION = "2021-07-28"
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"
+POSTERS = HERE / "posters"   # GBP-only image stills (Google rejects video)
 
 CTA = "https://ai-audit.springsyncai.com/landing"
 
@@ -160,8 +161,9 @@ def _find_gbp(accts):
 def upload_media(path: Path) -> str:
     """Upload a local file to the GHL media library; return its public URL."""
     loc = location_id()
+    ctype = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
     with open(path, "rb") as fh:
-        files = {"file": (path.name, fh, "video/mp4")}
+        files = {"file": (path.name, fh, ctype)}
         data = {"hosted": "false", "name": path.name, "altType": "location", "altId": loc}
         r = requests.post(f"{BASE}/medias/upload-file", headers=headers(), files=files, data=data, timeout=300)
     if r.status_code >= 300:
@@ -228,21 +230,29 @@ def cmd_plan(args):
         account_ids = [gbp.get("id") or gbp.get("_id")]
 
     user_id = get_user_id() if args.commit else "(dry-run)"
+    # Google Business Profile accepts ONE IMAGE only (no video). For google-only
+    # targets we post the still; video-capable platforms (FB/YouTube) get the video.
+    plat_by_id = {(a.get("id") or a.get("_id")): (a.get("platform") or "").lower() for a in accts}
+    gbp_only = bool(account_ids) and {plat_by_id.get(a, "") for a in account_ids} <= {"google"}
+    print(f"   media mode: {'IMAGE (GBP only supports photos)' if gbp_only else 'VIDEO'}")
     items = PLAN[args.offset:]
     if args.limit:
         items = items[:args.limit]
     print(f"{'COMMITTING' if args.commit else 'DRY RUN'} — {len(items)} of {len(PLAN)} posts "
           f"(offset {args.offset}) → accounts {account_ids}\n")
     for item in items:
-        path = OUT / item["video"]
+        if gbp_only:
+            path = POSTERS / item["video"].replace(".mp4", ".jpg")
+        else:
+            path = OUT / item["video"]
         if not path.exists():
-            sys.exit(f"missing video: {path}")
+            sys.exit(f"missing media: {path}")
         dt = datetime.combine(start + timedelta(days=item["day"]), dtime(item["hour"], 0))
         if TZ:
             dt = dt.replace(tzinfo=TZ)
         iso = dt.isoformat()
-        mime = mimetypes.guess_type(str(path))[0] or "video/mp4"
-        print(f"• {item['video']:<26} {iso}")
+        mime = mimetypes.guess_type(str(path))[0] or ("image/jpeg" if gbp_only else "video/mp4")
+        print(f"• {path.name:<26} {iso}")
         media_url = upload_media(path) if args.commit else "(dry-run, upload skipped)"
         create_post(account_ids, item["caption"], media_url, mime, iso, user_id, args.commit)
     print("\nDone." if args.commit else "\nDry run complete — add --commit to schedule for real.")
