@@ -42,6 +42,7 @@ from __future__ import annotations
 import os
 import sys
 import json
+import mimetypes
 import argparse
 from datetime import datetime, timedelta, time as dtime
 from pathlib import Path
@@ -172,14 +173,34 @@ def upload_media(path: Path) -> str:
     return url
 
 
-def create_post(account_ids, caption, media_url, when_iso, commit):
+def get_user_id():
+    """GHL requires a posting userId. Use GHL_USER_ID if set, else fetch one."""
+    uid = os.environ.get("GHL_USER_ID", "").strip()
+    if uid:
+        return uid
+    loc = location_id()
+    r = requests.get(f"{BASE}/users/", headers=headers(), params={"locationId": loc}, timeout=30)
+    if r.status_code >= 300:
+        sys.exit("Couldn't fetch a userId [{}]: {}\n\nFix: either add the 'Users (readonly)' scope to your "
+                 "Private Integration Token, OR find your user id in GHL (Settings -> My Staff -> click your "
+                 "name -> copy the id from the URL) and run:  export GHL_USER_ID=<that id>".format(r.status_code, r.text))
+    data = r.json()
+    users = data.get("users") or data.get("results") or (data.get("data") or {}).get("users") or []
+    users = [u for u in users if isinstance(u, dict)]
+    if not users:
+        sys.exit(f"No users returned to use as userId: {json.dumps(data)[:800]}\nSet export GHL_USER_ID=<id>.")
+    return users[0].get("id") or users[0].get("_id")
+
+
+def create_post(account_ids, caption, media_url, media_type, when_iso, user_id, commit):
     loc = location_id()
     payload = {
         "accountIds": account_ids,
         "summary": caption,
-        "media": [{"url": media_url, "type": "video"}],
+        "media": [{"url": media_url, "type": media_type}],
         "status": "scheduled",
         "scheduleDate": when_iso,
+        "userId": user_id,
         "type": "post",
     }
     if not commit:
@@ -188,7 +209,9 @@ def create_post(account_ids, caption, media_url, when_iso, commit):
     r = requests.post(f"{BASE}/social-media-posting/{loc}/posts", headers=headers(), json=payload, timeout=60)
     if r.status_code >= 300:
         sys.exit(f"create post failed [{r.status_code}]: {r.text}")
-    print(f"   scheduled ✓  id={r.json().get('id') or r.json().get('_id','?')}")
+    j = r.json()
+    pid = j.get("id") or (j.get("post") or {}).get("id") or j.get("_id", "?")
+    print(f"   scheduled ✓  id={pid}")
 
 
 def cmd_plan(args):
@@ -204,6 +227,7 @@ def cmd_plan(args):
             sys.exit("No Google Business Profile account found. Use --account <id> or --all-accounts (run 'verify' to list).")
         account_ids = [gbp.get("id") or gbp.get("_id")]
 
+    user_id = get_user_id() if args.commit else "(dry-run)"
     items = PLAN[args.offset:]
     if args.limit:
         items = items[:args.limit]
@@ -217,9 +241,10 @@ def cmd_plan(args):
         if TZ:
             dt = dt.replace(tzinfo=TZ)
         iso = dt.isoformat()
+        mime = mimetypes.guess_type(str(path))[0] or "video/mp4"
         print(f"• {item['video']:<26} {iso}")
         media_url = upload_media(path) if args.commit else "(dry-run, upload skipped)"
-        create_post(account_ids, item["caption"], media_url, iso, args.commit)
+        create_post(account_ids, item["caption"], media_url, mime, iso, user_id, args.commit)
     print("\nDone." if args.commit else "\nDry run complete — add --commit to schedule for real.")
 
 
