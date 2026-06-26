@@ -65,3 +65,7 @@ samples/springs-creative/_silent.mp4
 samples/springs-creative/voices/
 samples/springs-creative/_vo/
 samples/springs-creative/out/_*
+
+# GHL credentials (local only)
+ghl.env
+samples/springs-creative/ghl.env
