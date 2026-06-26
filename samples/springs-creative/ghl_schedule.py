@@ -215,7 +215,7 @@ def create_post(account_ids, caption, media_url, media_type, when_iso, user_id, 
     # YouTube requires a video title (and a privacy level); add when targeting YT.
     if "youtube" in platforms:
         yt_title = title if "#Shorts" in title else f"{title} #Shorts"
-        payload["youtube"] = {"title": yt_title[:100], "privacyLevel": "public"}
+        payload["youTubeOptions"] = {"title": yt_title[:100], "privacyLevel": "public"}
     if not commit:
         print(f"   DRY-RUN payload: accounts={account_ids} when={when_iso} media={media_url[:60]}…")
         return
