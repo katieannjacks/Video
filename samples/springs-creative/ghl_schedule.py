@@ -212,14 +212,15 @@ def create_post(account_ids, caption, media_url, media_type, when_iso, user_id, 
         "userId": user_id,
         "type": "post",
     }
-    # YouTube: GHL's exact options key is unknown (it rejected youtube/youTubeOptions).
-    # Try the documented camelCase block; override the key with GHL_YT_KEY once the
-    # error reveals the real field name. Set GHL_YT_KEY=none to send no YT block.
+    # YouTube: GHL accepts the plain payload (no options block). Add #Shorts to the
+    # description so vertical clips publish as Shorts. GHL_YT_KEY can still inject a
+    # custom options object if a future GHL version requires one.
     if "youtube" in platforms:
-        yt_key = os.environ.get("GHL_YT_KEY", "youTubeOptions").strip()
+        if "#Shorts" not in payload["summary"]:
+            payload["summary"] = payload["summary"].rstrip() + " #Shorts"
+        yt_key = os.environ.get("GHL_YT_KEY", "none").strip()
         if yt_key and yt_key.lower() != "none":
-            yt_title = title if "#Shorts" in title else f"{title} #Shorts"
-            payload[yt_key] = {"title": yt_title[:100], "privacyLevel": "public"}
+            payload[yt_key] = {"title": title[:100], "privacyLevel": "public"}
     if not commit:
         print(f"   DRY-RUN payload: accounts={account_ids} when={when_iso} media={media_url[:60]}…")
         return
@@ -281,9 +282,11 @@ def cmd_plan(args):
 # ---- dedupe: remove duplicate scheduled posts ------------------------------
 def list_posts(account_ids=None, from_iso=None, to_iso=None):
     loc = location_id()
-    body = {"type": "all", "skip": 0, "limit": 100}
+    # GHL validates these as STRINGS: skip/limit as number-strings, accounts as a
+    # comma-joined string id list.
+    body = {"type": "all", "skip": "0", "limit": "100"}
     if account_ids:
-        body["accounts"] = account_ids
+        body["accounts"] = ",".join(account_ids)
     if from_iso:
         body["fromDate"] = from_iso
     if to_iso:
