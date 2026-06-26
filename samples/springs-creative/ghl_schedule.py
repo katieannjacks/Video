@@ -70,18 +70,24 @@ CTA = "https://ai-audit.springsyncai.com/landing"
 # day_offset = days after --start ; hour = local ET hour
 PLAN = [
     dict(day=0,  hour=10, video="main-landscape.mp4",
+         title="Springs Creative Marketing — Strategy, Not Guesswork",
          caption=("Your next customer is already scrolling. Springs Creative Marketing helps "
                   "Triangle businesses show up with strategy, not guesswork — modern websites, "
                   f"clean local SEO, social that sounds like you, and practical AI. Book your FREE audit: {CTA}")),
     dict(day=2,  hour=10, video="websites-landscape.mp4",
+         title="Websites That Convert | Springs Creative Marketing",
          caption=f"Your website is your first impression. Modern, fast, built to convert. Free audit: {CTA}"),
     dict(day=4,  hour=10, video="local-seo-landscape.mp4",
+         title="Get Found Locally — Local SEO | Springs Creative",
          caption=f"When your neighbors search, be the first name they find. Clean local SEO + smart content. Free audit: {CTA}"),
     dict(day=7,  hour=10, video="social-landscape.mp4",
+         title="Social That Brings Real Leads | Springs Creative",
          caption=f"Your brand has a voice — your marketing should too. Social that brings in real leads. Free audit: {CTA}"),
     dict(day=9,  hour=10, video="ai-edge-landscape.mp4",
+         title="Practical AI for Local Business | Springs Creative",
          caption=f"Want an edge most local businesses don't have? Practical AI that saves you time. Free audit: {CTA}"),
     dict(day=11, hour=10, video="main-square.mp4",
+         title="Marketing Built to Grow | Springs Creative Marketing",
          caption=f"Marketing that's clear, measured, and built to grow. Book your FREE marketing audit: {CTA}"),
 ]
 
@@ -194,7 +200,7 @@ def get_user_id():
     return users[0].get("id") or users[0].get("_id")
 
 
-def create_post(account_ids, caption, media_url, media_type, when_iso, user_id, commit):
+def create_post(account_ids, caption, media_url, media_type, when_iso, user_id, platforms, title, commit):
     loc = location_id()
     payload = {
         "accountIds": account_ids,
@@ -205,10 +211,13 @@ def create_post(account_ids, caption, media_url, media_type, when_iso, user_id, 
         "userId": user_id,
         "type": "post",
     }
+    # YouTube requires a video title (and a privacy level); add when targeting YT.
+    if "youtube" in platforms:
+        payload["youtube"] = {"title": title[:100], "privacyLevel": "public"}
     if not commit:
         print(f"   DRY-RUN payload: accounts={account_ids} when={when_iso} media={media_url[:60]}…")
         return
-    r = requests.post(f"{BASE}/social-media-posting/{loc}/posts", headers=headers(), json=payload, timeout=60)
+    r = requests.post(f"{BASE}/social-media-posting/{loc}/posts", headers=headers(), json=payload, timeout=120)
     if r.status_code >= 300:
         sys.exit(f"create post failed [{r.status_code}]: {r.text}")
     j = r.json()
@@ -233,7 +242,8 @@ def cmd_plan(args):
     # Google Business Profile accepts ONE IMAGE only (no video). For google-only
     # targets we post the still; video-capable platforms (FB/YouTube) get the video.
     plat_by_id = {(a.get("id") or a.get("_id")): (a.get("platform") or "").lower() for a in accts}
-    gbp_only = bool(account_ids) and {plat_by_id.get(a, "") for a in account_ids} <= {"google"}
+    platforms = {plat_by_id.get(a, "") for a in account_ids}
+    gbp_only = bool(account_ids) and platforms <= {"google"}
     print(f"   media mode: {'IMAGE (GBP only supports photos)' if gbp_only else 'VIDEO'}")
     items = PLAN[args.offset:]
     if args.limit:
@@ -254,7 +264,8 @@ def cmd_plan(args):
         mime = mimetypes.guess_type(str(path))[0] or ("image/jpeg" if gbp_only else "video/mp4")
         print(f"• {path.name:<26} {iso}")
         media_url = upload_media(path) if args.commit else "(dry-run, upload skipped)"
-        create_post(account_ids, item["caption"], media_url, mime, iso, user_id, args.commit)
+        create_post(account_ids, item["caption"], media_url, mime, iso, user_id,
+                    platforms, item.get("title", "Springs Creative Marketing"), args.commit)
     print("\nDone." if args.commit else "\nDry run complete — add --commit to schedule for real.")
 
 
