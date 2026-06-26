@@ -96,7 +96,8 @@ PLAN = [
 def headers():
     tok = os.environ.get("GHL_TOKEN", "").strip()
     if not tok:
-        sys.exit("Set GHL_TOKEN (export GHL_TOKEN=pit-...).")
+        sys.exit("No GHL_TOKEN found. Put it in ghl.env (copy ghl.env.example -> ghl.env "
+                 "and paste your token), or run: export GHL_TOKEN=pit-...")
     return {"Authorization": f"Bearer {tok}", "Version": VERSION, "Accept": "application/json"}
 
 

@@ -31,6 +31,19 @@ YT="6a3c1f7779a3769b79a98f27_ibvPpyoxFegC4gujJX5f_UCCWABfhzbTlDuVbahQ3s40w_profi
 echo "=== Springs Creative autopost — week of $START — $MODE ==="
 git pull --quiet || true
 
+# --- token preflight (rotate-proof): stop early with clear steps if login fails
+if ! python3 "$S" verify >/dev/null 2>&1; then
+  echo
+  echo "❌ Your GHL token isn't working (it was probably rotated or expired)."
+  echo "   Fix it in 3 steps:"
+  echo "   1) In GHL: Settings → Private Integrations → create a new token"
+  echo "      (scopes: Social Planner + Medias)."
+  echo "   2) Run:  open -e ghl.env   → paste the new token after GHL_TOKEN= , save."
+  echo "   3) Re-run this same command."
+  exit 1
+fi
+echo "✓ GHL login OK"
+
 echo; echo ">> Google Business Profile (branded images)"
 python3 "$S" plan --start "$START" $COMMIT
 
