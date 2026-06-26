@@ -40,6 +40,7 @@ Notes:
 from __future__ import annotations
 
 import os
+import re
 import sys
 import json
 import mimetypes
@@ -213,7 +214,8 @@ def create_post(account_ids, caption, media_url, media_type, when_iso, user_id, 
     }
     # YouTube requires a video title (and a privacy level); add when targeting YT.
     if "youtube" in platforms:
-        payload["youtube"] = {"title": title[:100], "privacyLevel": "public"}
+        yt_title = title if "#Shorts" in title else f"{title} #Shorts"
+        payload["youtube"] = {"title": yt_title[:100], "privacyLevel": "public"}
     if not commit:
         print(f"   DRY-RUN payload: accounts={account_ids} when={when_iso} media={media_url[:60]}…")
         return
@@ -254,7 +256,10 @@ def cmd_plan(args):
         if gbp_only:
             path = POSTERS / item["video"].replace(".mp4", ".jpg")
         else:
-            path = OUT / item["video"]
+            vid = item["video"]
+            if args.vertical:   # use the 9:16 cut (YouTube Shorts / Reels / Stories)
+                vid = re.sub(r"-(landscape|square)\.mp4$", "-vertical.mp4", vid)
+            path = OUT / vid
         if not path.exists():
             sys.exit(f"missing media: {path}")
         dt = datetime.combine(start + timedelta(days=item["day"]), dtime(item["hour"], 0))
@@ -280,6 +285,7 @@ def main():
     p.add_argument("--all-accounts", action="store_true", help="post to every connected account")
     p.add_argument("--limit", type=int, default=0, help="only process the first N posts (0 = all)")
     p.add_argument("--offset", type=int, default=0, help="skip the first N posts")
+    p.add_argument("--vertical", action="store_true", help="use the 9:16 cuts (YouTube Shorts / Reels)")
     args = ap.parse_args()
     {"verify": cmd_verify, "plan": cmd_plan}[args.cmd](args)
 
