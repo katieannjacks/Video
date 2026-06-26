@@ -61,16 +61,44 @@ def _load48(path: Path):
 _vo_cache: dict = {}
 
 
+try:
+    from vo_lines import VO as _VO_LINES
+    _TEXT2KEY = {v: k for k, v in _VO_LINES.items()}
+except Exception:
+    _TEXT2KEY = {}
+ELEVEN_DIR = ROOT / "vo_eleven"   # ElevenLabs audio (your voice), if generated
+
+
+def _eleven_for(text: str):
+    key = _TEXT2KEY.get(text)
+    if not key:
+        return None
+    for ext in (".mp3", ".wav", ".m4a"):
+        p = ELEVEN_DIR / f"{key}{ext}"
+        if p.exists():
+            return p
+    return None
+
+
 def vo(text: str):
-    """Synthesize a line → (samples@48k mono, duration_s). Cached on disk."""
+    """Synthesize a line → (samples@48k mono, duration_s). Cached on disk.
+
+    Prefers your ElevenLabs audio (vo_eleven/<key>.<ext>) when present; otherwise
+    falls back to the free local Piper voice.
+    """
     if text in _vo_cache:
         return _vo_cache[text]
     h = hashlib.md5(text.encode()).hexdigest()[:12]
-    wav = VOCACHE / f"{h}.wav"
+    src = _eleven_for(text)
+    wav = VOCACHE / f"{h}_{'el' if src else 'pp'}.wav"   # separate caches per source
     if not wav.exists():
-        subprocess.run([sys.executable, "-m", "piper", "--model", str(VOICE),
-                        "--output_file", str(wav)], input=text.encode(),
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if src:  # decode ElevenLabs mp3/m4a → 48k mono wav
+            subprocess.run(["ffmpeg", "-y", "-i", str(src), "-ac", "1", "-ar", str(SR), str(wav)],
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:    # free Piper voice
+            subprocess.run([sys.executable, "-m", "piper", "--model", str(VOICE),
+                            "--output_file", str(wav)], input=text.encode(),
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     a = _load48(wav)
     _vo_cache[text] = (a, len(a) / SR)
     return _vo_cache[text]
