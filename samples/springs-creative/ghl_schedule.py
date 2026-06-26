@@ -212,10 +212,14 @@ def create_post(account_ids, caption, media_url, media_type, when_iso, user_id, 
         "userId": user_id,
         "type": "post",
     }
-    # YouTube requires a video title (and a privacy level); add when targeting YT.
+    # YouTube: GHL's exact options key is unknown (it rejected youtube/youTubeOptions).
+    # Try the documented camelCase block; override the key with GHL_YT_KEY once the
+    # error reveals the real field name. Set GHL_YT_KEY=none to send no YT block.
     if "youtube" in platforms:
-        yt_title = title if "#Shorts" in title else f"{title} #Shorts"
-        payload["youTubeOptions"] = {"title": yt_title[:100], "privacyLevel": "public"}
+        yt_key = os.environ.get("GHL_YT_KEY", "youTubeOptions").strip()
+        if yt_key and yt_key.lower() != "none":
+            yt_title = title if "#Shorts" in title else f"{title} #Shorts"
+            payload[yt_key] = {"title": yt_title[:100], "privacyLevel": "public"}
     if not commit:
         print(f"   DRY-RUN payload: accounts={account_ids} when={when_iso} media={media_url[:60]}…")
         return
@@ -274,6 +278,60 @@ def cmd_plan(args):
     print("\nDone." if args.commit else "\nDry run complete — add --commit to schedule for real.")
 
 
+# ---- dedupe: remove duplicate scheduled posts ------------------------------
+def list_posts(account_ids=None, from_iso=None, to_iso=None):
+    loc = location_id()
+    body = {"type": "all", "skip": 0, "limit": 100}
+    if account_ids:
+        body["accounts"] = account_ids
+    if from_iso:
+        body["fromDate"] = from_iso
+    if to_iso:
+        body["toDate"] = to_iso
+    hd = {**headers(), "Content-Type": "application/json"}
+    r = requests.post(f"{BASE}/social-media-posting/{loc}/posts/list", headers=hd, json=body, timeout=60)
+    if r.status_code >= 300:
+        sys.exit(f"list posts failed [{r.status_code}]: {r.text}")
+    data = r.json()
+    posts = (data.get("posts") or (data.get("results") or {}).get("posts")
+             or data.get("data") or [])
+    return data, [p for p in posts if isinstance(p, dict)]
+
+
+def delete_post(pid):
+    loc = location_id()
+    r = requests.delete(f"{BASE}/social-media-posting/{loc}/posts/{pid}", headers=headers(), timeout=30)
+    if r.status_code >= 300:
+        sys.exit(f"delete failed for {pid} [{r.status_code}]: {r.text}")
+
+
+def cmd_dedupe(args):
+    accs = [args.account] if args.account else None
+    data, posts = list_posts(accs, args.frm, args.to)
+    if not posts:
+        print("Couldn't parse any posts. Raw response (send to Claude):")
+        print(json.dumps(data, indent=2)[:3500])
+        return
+    # group by (accounts, scheduleDate); duplicates share both
+    groups = {}
+    for p in posts:
+        pid = p.get("_id") or p.get("id")
+        pa = p.get("accountIds") or p.get("accounts") or []
+        key = (tuple(sorted(map(str, pa))), str(p.get("scheduleDate")))
+        groups.setdefault(key, []).append(p)
+    dupes = [p for plist in groups.values() if len(plist) > 1 for p in plist[1:]]
+    print(f"{len(posts)} posts found, {len(groups)} unique slots, {len(dupes)} duplicate(s) to remove\n")
+    for p in dupes:
+        pid = p.get("_id") or p.get("id")
+        print(f"  {'DELETING' if args.commit else 'would delete'}  {pid}  {p.get('scheduleDate')}  "
+              f"{str(p.get('summary',''))[:42]}")
+        if args.commit:
+            delete_post(pid)
+    if not dupes:
+        print("No duplicates — nothing to do.")
+    print("\nDone." if args.commit else "\nDry run — add --commit to actually delete.")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Schedule Springs Creative videos to GHL Social Planner")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -286,8 +344,13 @@ def main():
     p.add_argument("--limit", type=int, default=0, help="only process the first N posts (0 = all)")
     p.add_argument("--offset", type=int, default=0, help="skip the first N posts")
     p.add_argument("--vertical", action="store_true", help="use the 9:16 cuts (YouTube Shorts / Reels)")
+    d = sub.add_parser("dedupe", help="remove duplicate scheduled posts (same account + time)")
+    d.add_argument("--account", help="limit to one account id (e.g. your Facebook page)")
+    d.add_argument("--from", dest="frm", default="2026-06-28T00:00:00Z", help="window start ISO")
+    d.add_argument("--to", dest="to", default="2026-07-12T00:00:00Z", help="window end ISO")
+    d.add_argument("--commit", action="store_true", help="actually delete (default is dry run)")
     args = ap.parse_args()
-    {"verify": cmd_verify, "plan": cmd_plan}[args.cmd](args)
+    {"verify": cmd_verify, "plan": cmd_plan, "dedupe": cmd_dedupe}[args.cmd](args)
 
 
 if __name__ == "__main__":
