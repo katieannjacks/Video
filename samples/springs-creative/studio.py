@@ -36,6 +36,11 @@ VOICE_URL = "https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-en-
 
 # ---- voiceover (Piper neural TTS, free / local) ----------------------------
 def ensure_voice():
+    # If every scripted line has ElevenLabs audio, the Piper fallback is unused —
+    # skip its download entirely.
+    if _TEXT2KEY and all(_eleven_for(t) for t in _TEXT2KEY):
+        print("voiceover: ElevenLabs audio found for all lines — skipping Piper download")
+        return
     if VOICE.exists():
         return
     VOICES.mkdir(exist_ok=True)
