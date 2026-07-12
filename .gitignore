@@ -58,3 +58,14 @@ master.srt
 takes_packed.md
 edl.json
 project.md
+
+# Client-provided brand kit (proprietary; not redistributed)
+samples/springs-creative/brandkit/
+samples/springs-creative/_silent.mp4
+samples/springs-creative/voices/
+samples/springs-creative/_vo/
+samples/springs-creative/out/_*
+
+# GHL credentials (local only)
+ghl.env
+samples/springs-creative/ghl.env

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "sources": {
+    "scene1": "../sources/scene1.mp4",
+    "scene2": "../sources/scene2.mp4",
+    "scene3": "../sources/scene3.mp4"
+  },
+  "ranges": [
+    {
+      "source": "scene1",
+      "start": 0.4,
+      "end": 5.4,
+      "beat": "HOOK",
+      "quote": "drop footage, chat, done",
+      "reason": "trim lead-in and tail hold"
+    },
+    {
+      "source": "scene2",
+      "start": 0.4,
+      "end": 5.4,
+      "beat": "HOW",
+      "quote": "it reads the video",
+      "reason": "pipeline reveal lands inside the window"
+    },
+    {
+      "source": "scene3",
+      "start": 0.4,
+      "end": 5.4,
+      "beat": "PAYOFF",
+      "quote": "get final.mp4 back",
+      "reason": "hold on the open-source line"
+    }
+  ],
+  "grade": "warm_cinematic",
+  "overlays": [
+    {
+      "file": "animations/slot_1/render.mov",
+      "start_in_output": 0.0,
+      "duration": 15.0
+    }
+  ],
+  "subtitles": "master.srt",
+  "total_duration_s": 15.0
+}
