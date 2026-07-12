@@ -93,6 +93,30 @@ PLAN = [
 ]
 
 
+# B-roll photo posts — fill the Tue/Thu gaps between the main Mon/Wed/Fri plan.
+# Use the SAME --start Monday as the main plan; these land on days 1/3/8/10.
+PLAN_BROLL = [
+    dict(day=1,  hour=10, video="broll-local-pride-landscape.mp4",
+         title="Proudly Serving Holly Springs & The Triangle",
+         caption=("From Main Street to the whole Triangle — when your neighbors search, "
+                  f"be the name they find. Book your FREE audit: {CTA}")),
+    dict(day=3,  hour=10, video="broll-meet-katie-landscape.mp4",
+         title="Meet Katie Jackson — Springs Creative Marketing",
+         caption=("Hi, I'm Katie 👋 Founder & CEO of Springs Creative Marketing — helping Triangle "
+                  f"businesses grow with strategy, not guesswork. Book your FREE audit: {CTA}")),
+    dict(day=8,  hour=10, video="broll-our-work-landscape.mp4",
+         title="Our Work — Websites That Win Customers",
+         caption=("A look at our work: aiagentvet.com — modern, fast, and built to convert. "
+                  f"Want a site that wins customers? Book your FREE audit: {CTA}")),
+    dict(day=10, hour=10, video="broll-ai-advantage-landscape.mp4",
+         title="5-Star Reviews on Autopilot | Springs Creative",
+         caption=("The AI advantage: 5-star reviews on autopilot with SpringSync. Practical AI that "
+                  f"grows your reputation while you work. Book your FREE audit: {CTA}")),
+]
+
+PLANS = {"launch": PLAN, "broll": PLAN_BROLL}
+
+
 def headers():
     tok = os.environ.get("GHL_TOKEN", "").strip()
     if not tok:
@@ -246,6 +270,7 @@ def cmd_plan(args):
             sys.exit("No Google Business Profile account found. Use --account <id> or --all-accounts (run 'verify' to list).")
         account_ids = [gbp.get("id") or gbp.get("_id")]
 
+    plan = PLANS[args.plan]
     user_id = get_user_id() if args.commit else "(dry-run)"
     # Google Business Profile accepts ONE IMAGE only (no video). For google-only
     # targets we post the still; video-capable platforms (FB/YouTube) get the video.
@@ -253,10 +278,10 @@ def cmd_plan(args):
     platforms = {plat_by_id.get(a, "") for a in account_ids}
     gbp_only = bool(account_ids) and platforms <= {"google"}
     print(f"   media mode: {'IMAGE (GBP only supports photos)' if gbp_only else 'VIDEO'}")
-    items = PLAN[args.offset:]
+    items = plan[args.offset:]
     if args.limit:
         items = items[:args.limit]
-    print(f"{'COMMITTING' if args.commit else 'DRY RUN'} — {len(items)} of {len(PLAN)} posts "
+    print(f"{'COMMITTING' if args.commit else 'DRY RUN'} — {len(items)} of {len(plan)} posts "
           f"(offset {args.offset}) → accounts {account_ids}\n")
     for item in items:
         if gbp_only:
@@ -341,7 +366,9 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("verify", help="check token + list connected accounts")
     p = sub.add_parser("plan", help="schedule the PLAN to GBP")
-    p.add_argument("--start", required=True, help="first post date, YYYY-MM-DD")
+    p.add_argument("--start", required=True, help="anchor Monday, YYYY-MM-DD")
+    p.add_argument("--plan", choices=sorted(PLANS), default="launch",
+                   help="which post set: launch (Mon/Wed/Fri) or broll (Tue/Thu fill-ins)")
     p.add_argument("--commit", action="store_true", help="actually write to GHL (default is dry run)")
     p.add_argument("--account", help="post to a specific account id")
     p.add_argument("--all-accounts", action="store_true", help="post to every connected account")
