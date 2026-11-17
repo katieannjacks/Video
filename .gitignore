@@ -60,3 +60,6 @@ edl.json
 project.md
 source/
 output/work/
+output/*.mp4
+output/*.jpg
+output/transcripts/
